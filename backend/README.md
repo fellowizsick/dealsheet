@@ -49,3 +49,4 @@ curl -X POST http://localhost:8000/extract -F "file=@sample_contract.pdf"
 - No auth/rate-limiting — add before public deployment
 - Scanned PDFs fail cleanly — add OCR fallback (Tesseract/Textract) if needed
 - Results are not stored — add a DB for deal history
+# Rebuild trigger
