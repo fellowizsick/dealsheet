@@ -4,9 +4,19 @@ from typing import List, Optional
 from pathlib import Path
 
 import stripe
+import sentry_sdk
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+
+# Sentry — error monitoring (opt-in via SENTRY_DSN env var)
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.1,
+        environment=os.environ.get("ENVIRONMENT", "production"),
+    )
 
 from schemas import ExtractionResponse, UnderwritingResult, UnderwritingInput
 from pdf_utils import extract_text_from_pdf, PDFTextExtractionError

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "../auth-context";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import UnderwritingModal from "./UnderwritingModal";
+import WelcomeModal from "./WelcomeModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const COLORS = ["#1C1810", "#B5652B", "#D98A4D", "#5C3413", "#A39C8E", "#453D30"];
@@ -386,6 +387,7 @@ export default function DashboardPage() {
       {underwritingDeal && (
         <UnderwritingModal deal={underwritingDeal} token={token} onClose={() => setUnderwritingDeal(null)} />
       )}
+      {hasNoDeals && <WelcomeModal />}
     </div>
   );
 }
