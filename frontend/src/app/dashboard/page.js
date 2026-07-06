@@ -100,6 +100,8 @@ export default function DashboardPage() {
 
   const dealsByStatus = {};
   STATUSES.forEach((s) => { dealsByStatus[s.key] = extractions.filter((e) => (e.status || "active") === s.key); });
+  
+  const hasNoDeals = extractions.length === 0;
 
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
@@ -184,7 +186,22 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Pipeline Kanban */}
+        {/* Pipeline Kanban or Empty State */}
+        {hasNoDeals ? (
+          <div className="bg-white rounded-xl p-8 lg:p-12 border border-[#F0EDE6] text-center mb-6 animate-fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1C1810]/5 to-[#B5652B]/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📋</span>
+            </div>
+            <h2 className="text-lg font-semibold text-[#1C1810] mb-2">No deals yet</h2>
+            <p className="text-sm text-[#A39C8E] mb-6 max-w-md mx-auto">
+              Upload your first purchase agreement to extract deal data, or add a deal manually to start tracking your pipeline.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Link href="/" className="btn btn-primary text-sm">Upload a Contract</Link>
+              <button onClick={() => setShowManual(true)} className="btn btn-secondary text-sm">Add Manually</button>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
           {STATUSES.map((column) => (
             <div key={column.key} className="bg-[#FAF9F6] rounded-xl p-3 lg:p-4 border border-[#F0EDE6] min-h-[200px]">
@@ -231,6 +248,7 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-6 mb-4 lg:mb-8">
