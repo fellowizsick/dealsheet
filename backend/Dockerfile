@@ -2,14 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies (supports build from repo root or backend/)
-COPY requirements.txt backend/requirements.txt ./
-RUN if [ -f backend/requirements.txt ]; then cp backend/requirements.txt .; fi && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code (supports both build contexts)
-COPY . /app/
-COPY backend/ /app/
+# Copy app code
+COPY backend/ .
 
 # Expose port
 EXPOSE 8000
