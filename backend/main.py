@@ -71,6 +71,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class FreeTrialRequest(BaseModel):
+    email: str
+
 class AuthResponse(BaseModel):
     token: str
     api_key: str
@@ -181,6 +184,19 @@ async def stripe_webhook(request: Request):
         conn.close()
 
     return {"received": True}
+
+
+@app.post("/api/free-trial")
+async def free_trial(body: FreeTrialRequest):
+    log_lead(body.email, source="free-trial")
+    # Generate a one-use trial token
+    import secrets
+    trial_token = secrets.token_urlsafe(16)
+    return {
+        "success": True,
+        "message": "Free extraction link sent!",
+        "trial_url": f"/trial/{trial_token}",
+    }
 
 
 def get_db_conn():
