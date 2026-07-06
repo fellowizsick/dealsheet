@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../auth-context";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import UnderwritingModal from "./UnderwritingModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const COLORS = ["#1C1810", "#B5652B", "#D98A4D", "#5C3413", "#A39C8E", "#453D30"];
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [pipelineStats, setPipelineStats] = useState({ active: 0, under_contract: 0, closed: 0, archived: 0, total: 0 });
   const [showManual, setShowManual] = useState(false);
+  const [underwritingDeal, setUnderwritingDeal] = useState(null);
   const { user, token, logout, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -213,6 +215,10 @@ export default function DashboardPage() {
                           → {s.label}
                         </button>
                       ))}
+                      <button onClick={(e) => { e.stopPropagation(); setUnderwritingDeal(deal); }}
+                        className="text-[10px] px-1.5 py-0.5 rounded-md border hover:bg-[#FAF9F6] transition-colors text-[#B5652B] border-[#E8E4DC] ml-auto">
+                        📊 Analyze
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -283,6 +289,11 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Underwriting Modal */}
+      {underwritingDeal && (
+        <UnderwritingModal deal={underwritingDeal} token={token} onClose={() => setUnderwritingDeal(null)} />
+      )}
     </div>
   );
 }

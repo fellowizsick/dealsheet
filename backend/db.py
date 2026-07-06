@@ -191,3 +191,32 @@ def increment_request_count(api_key: str):
     )
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Underwriting
+# ---------------------------------------------------------------------------
+def save_underwriting(extraction_id: int, user_id: int, underwriting_json: str):
+    conn = get_conn()
+    # Add underwriting column if not exists
+    try:
+        conn.execute("ALTER TABLE extractions ADD COLUMN underwriting TEXT DEFAULT NULL")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    conn.execute(
+        "UPDATE extractions SET underwriting = ? WHERE id = ? AND user_id = ?",
+        (underwriting_json, extraction_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_underwriting(extraction_id: int, user_id: int) -> Optional[str]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT underwriting FROM extractions WHERE id = ? AND user_id = ?",
+        (extraction_id, user_id),
+    ).fetchone()
+    conn.close()
+    return row["underwriting"] if row and row["underwriting"] else None

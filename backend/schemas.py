@@ -62,3 +62,31 @@ class ExtractionResponse(BaseModel):
     key_dates: Optional[KeyDates] = None
     contingencies: List[Contingency] = Field(default_factory=list)
     extraction_notes: Optional[str] = Field(None, description="Any caveats, assumptions, or warnings about the extraction")
+
+
+# ---------------------------------------------------------------------------
+# Underwriting / Deal Analysis
+# ---------------------------------------------------------------------------
+class UnderwritingInput(BaseModel):
+    """User-provided assumptions for deal analysis."""
+    purchase_price: float = Field(..., description="Purchase price of the property")
+    monthly_rent: Optional[float] = Field(None, description="Expected monthly rent (for income properties)")
+    annual_expenses: Optional[float] = Field(None, description="Annual operating expenses (taxes, insurance, HOA, etc.)")
+    down_payment_percent: float = Field(20.0, description="Down payment percentage (e.g. 20 = 20%)")
+    interest_rate: float = Field(6.5, description="Annual interest rate on loan")
+    loan_term_years: int = Field(30, description="Loan term in years")
+    rehab_cost: Optional[float] = Field(None, description="Estimated rehab/repair costs (for flips)")
+    after_repair_value: Optional[float] = Field(None, description="Estimated ARV after repairs (for flips)")
+    closing_costs: float = Field(0.0, description="Estimated closing costs")
+
+
+class UnderwritingResult(BaseModel):
+    cap_rate: Optional[float] = Field(None, description="Net Operating Income / Purchase Price")
+    cash_on_cash_return: Optional[float] = Field(None, description="Annual pre-tax cash flow / total cash invested")
+    monthly_cash_flow: Optional[float] = Field(None, description="Monthly cash flow after mortgage")
+    total_cash_invested: Optional[float] = Field(None, description="Down payment + closing costs")
+    debt_service: Optional[float] = Field(None, description="Monthly mortgage payment")
+    noi: Optional[float] = Field(None, description="Net Operating Income (annual)")
+    flip_margin: Optional[float] = Field(None, description="(ARV - Purchase - Rehab) / ARV")
+    flip_profit: Optional[float] = Field(None, description="Dollar profit on flip")
+    assumptions: UnderwritingInput = Field(..., description="Assumptions used for the calculation")

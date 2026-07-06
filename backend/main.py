@@ -8,13 +8,16 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
-from schemas import ExtractionResponse
+from schemas import ExtractionResponse, UnderwritingResult, UnderwritingInput
 from pdf_utils import extract_text_from_pdf, PDFTextExtractionError
 from extractor import extract_purchase_agreement, MODEL_NAME
 from csv_utils import result_to_csv_row, results_to_csv_bytes
 from db import init_db, create_user, get_user_by_email, get_user_by_id, save_extraction, get_user_extractions, check_rate_limit, increment_request_count
 from auth import hash_password, verify_password, generate_api_key, create_token, get_current_user
 from leads import log_lead
+
+# Underwriting engine
+import math
 
 # ---------------------------------------------------------------------------
 # App Setup
@@ -308,6 +311,78 @@ async def add_manual_deal(data: dict, user: dict = Depends(get_current_user)):
     from db import save_manual_deal
     save_manual_deal(user["id"], data.get("filename", "Manual Deal"), json.dumps(data.get("result", {})), data.get("status", "active"), data.get("tags", ""))
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Underwriting
+# ---------------------------------------------------------------------------
+@app.post("/extractions/{extraction_id}/underwrite", response_model=UnderwritingResult)
+async def underwrite_deal(extraction_id: int, body: UnderwritingInput, user: dict = Depends(get_current_user)):
+    """Calculate underwriting metrics for a deal."""
+    pp = body.purchase_price
+    dp = pp * (body.down_payment_percent / 100)
+    total_cash = dp + body.closing_costs
+
+    result = UnderwritingResult(assumptions=body)
+
+    # Mortgage calculation
+    loan = pp - dp
+    if loan > 0 and body.interest_rate > 0 and body.loan_term_years > 0:
+        monthly_rate = (body.interest_rate / 100) / 12
+        n_payments = body.loan_term_years * 12
+        if monthly_rate > 0:
+            debt_service = loan * (monthly_rate * (1 + monthly_rate) ** n_payments) / ((1 + monthly_rate) ** n_payments - 1)
+        else:
+            debt_service = loan / n_payments
+        result.debt_service = round(debt_service, 2)
+    else:
+        result.debt_service = 0
+
+    # Income property analysis (cap rate, cash-on-cash)
+    if body.monthly_rent and body.annual_expenses is not None:
+        annual_rent = body.monthly_rent * 12
+        noi = annual_rent - body.annual_expenses
+        result.noi = round(noi, 2)
+
+        if pp > 0:
+            result.cap_rate = round((noi / pp) * 100, 2)
+
+        annual_debt = (result.debt_service or 0) * 12
+        annual_cash_flow = noi - annual_debt
+        result.monthly_cash_flow = round(annual_cash_flow / 12, 2)
+
+        if total_cash > 0:
+            result.cash_on_cash_return = round((annual_cash_flow / total_cash) * 100, 2)
+
+        result.total_cash_invested = round(total_cash, 2)
+
+    # Flip analysis
+    if body.rehab_cost is not None and body.after_repair_value is not None:
+        flip_profit = body.after_repair_value - pp - body.rehab_cost
+        result.flip_profit = round(flip_profit, 2)
+        if body.after_repair_value > 0:
+            result.flip_margin = round((flip_profit / body.after_repair_value) * 100, 2)
+
+    # Add total_cash_invested if not already set
+    if result.total_cash_invested is None:
+        result.total_cash_invested = round(total_cash, 2)
+
+    # Save to DB
+    from db import save_underwriting
+    import json
+    save_underwriting(extraction_id, user["id"], result.model_dump_json())
+
+    return result
+
+
+@app.get("/extractions/{extraction_id}/underwrite")
+async def get_deal_underwriting(extraction_id: int, user: dict = Depends(get_current_user)):
+    """Get saved underwriting analysis for a deal."""
+    from db import get_underwriting
+    data = get_underwriting(extraction_id, user["id"])
+    if not data:
+        return None
+    return json.loads(data)
 
 
 # ---------------------------------------------------------------------------
