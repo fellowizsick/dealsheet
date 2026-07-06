@@ -4,7 +4,7 @@ from typing import List, Optional
 from pathlib import Path
 
 import stripe
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
@@ -83,6 +83,16 @@ class AuthResponse(BaseModel):
     user_id: int
     email: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -111,11 +121,122 @@ async def login(body: LoginRequest):
 
 
 # ---------------------------------------------------------------------------
-# Rate limit
+# Email Verification
+# ---------------------------------------------------------------------------
+@app.post("/auth/send-verification")
+async def send_verification(user: dict = Depends(get_current_user)):
+    """Send verification email to the current user."""
+    import resend, secrets
+    from db import set_verification_token
+
+    resend.api_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend.api_key:
+        raise HTTPException(status_code=400, detail="Email service not configured")
+
+    token = secrets.token_urlsafe(32)
+    set_verification_token(user["id"], token)
+    frontend = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    link = f"{frontend}/verify-email?token={token}"
+
+    try:
+        resend.Emails.send({
+            "from": "DealSheet <noreply@dealsheet.app>",
+            "to": user["email"],
+            "subject": "Verify your DealSheet account",
+            "html": f"""<p>Welcome to DealSheet!</p><p>Click <a href="{link}">here</a> to verify your email address.</p><p>Or paste this link: {link}</p>"""
+        })
+        return {"ok": True, "message": "Verification email sent"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/auth/verify-email")
+async def verify_email(body: VerifyEmailRequest):
+    """Verify email using token from email link."""
+    from db import get_user_by_verification_token, set_verified
+    user = get_user_by_verification_token(body.token)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    set_verified(user["id"])
+    return {"ok": True, "message": "Email verified"}
+
+
+# ---------------------------------------------------------------------------
+# Password Reset
+# ---------------------------------------------------------------------------
+@app.post("/auth/forgot-password")
+async def forgot_password(body: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    """Send password reset email."""
+    import secrets, resend
+    from db import get_user_by_email, set_reset_token
+    from datetime import datetime, timedelta, timezone
+
+    user = get_user_by_email(body.email)
+    # Always return OK to prevent email enumeration
+    if not user:
+        return {"ok": True, "message": "If that email exists, a reset link was sent"}
+
+    resend.api_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend.api_key:
+        return {"ok": True, "message": "If that email exists, a reset link was sent"}
+
+    token = secrets.token_urlsafe(32)
+    expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    set_reset_token(user["id"], token, expires)
+
+    frontend = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    link = f"{frontend}/reset-password?token={token}"
+
+    def send():
+        try:
+            resend.Emails.send({
+                "from": "DealSheet <noreply@dealsheet.app>",
+                "to": user["email"],
+                "subject": "Reset your DealSheet password",
+                "html": f"""<p>Click <a href="{link}">here</a> to reset your password.</p><p>This link expires in 1 hour.</p><p>If you didn't request this, ignore this email.</p>"""
+            })
+        except Exception:
+            pass  # Log in production
+
+    background_tasks.add_task(send)
+    return {"ok": True, "message": "If that email exists, a reset link was sent"}
+
+
+@app.post("/auth/reset-password")
+async def reset_password(body: ResetPasswordRequest):
+    """Reset password using token from email."""
+    from db import get_user_by_reset_token, clear_reset_token
+    from auth import hash_password
+
+    user = get_user_by_reset_token(body.token)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    new_hash = hash_password(body.password)
+    conn = get_db_conn()
+    conn.execute("UPDATE users SET password = ? WHERE id = ?", (new_hash, user["id"]))
+    conn.commit()
+    conn.close()
+    clear_reset_token(user["id"])
+    return {"ok": True, "message": "Password reset successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Rate limit — tiered (free 50/day, paid unlimited)
 # ---------------------------------------------------------------------------
 def check_rate(user: dict = Depends(get_current_user)):
-    if not check_rate_limit(user["api_key"], RATE_LIMIT_PER_DAY):
-        raise HTTPException(status_code=429, detail=f"Rate limit ({RATE_LIMIT_PER_DAY}/day) exceeded")
+    """Tiered rate limit: free users 50/day, paid users unlimited."""
+    is_paid = user.get("subscription_status") in ("active", "canceled") and user.get("stripe_customer_id")
+    max_per_day = 0 if is_paid else 50  # 0 = unlimited
+
+    if max_per_day > 0 and not check_rate_limit(user["api_key"], max_per_day):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Free limit ({max_per_day}/day) reached. Subscribe for unlimited extractions.",
+        )
     return user
 
 
@@ -344,6 +465,9 @@ async def get_sample_contract():
 # ---------------------------------------------------------------------------
 @app.post("/extract", response_model=ExtractionResponse)
 async def extract(file: UploadFile = File(...), user: dict = Depends(check_rate)):
+    # Check email verification
+    if not user.get("is_verified"):
+        raise HTTPException(status_code=403, detail="Verify your email first. Check your inbox or request a new verification link.")
     _validate_pdf(file)
     text = await _get_text(file)
     try:

@@ -86,6 +86,9 @@ export default function LoginPage() {
             Create your account
           </Link>
         </p>
+        <p className="text-xs text-[#A39C8E] text-center mt-3">
+          <Link href="/forgot-password" className="hover:text-[#B5652B] transition-colors">Forgot password?</Link>
+        </p>
 
         <hr className="separator" />
         <div className="flex items-center justify-center gap-4 text-xs text-[#A39C8E]">

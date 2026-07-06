@@ -69,9 +69,9 @@ def get_user_by_email(email: str) -> Optional[sqlite3.Row]:
 
 
 def migrate_user_schema():
-    """Add subscription columns if they don't exist yet."""
+    """Add subscription & email columns if they don't exist yet."""
     conn = get_conn()
-    for col in ["subscription_status", "subscription_ends_at"]:
+    for col in ["subscription_status", "subscription_ends_at", "is_verified", "verification_token", "reset_token", "reset_token_expires"]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT NULL")
             conn.commit()
@@ -103,6 +103,54 @@ def get_subscription(user_id: int) -> dict:
     if row and row["subscription_status"]:
         return {"status": row["subscription_status"], "ends_at": row["subscription_ends_at"]}
     return {"status": None, "ends_at": None}
+
+
+def set_verified(user_id: int):
+    conn = get_conn()
+    migrate_user_schema()
+    conn.execute("UPDATE users SET is_verified = '1', verification_token = NULL WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_verification_token(user_id: int, token: str):
+    conn = get_conn()
+    migrate_user_schema()
+    conn.execute("UPDATE users SET verification_token = ? WHERE id = ?", (token, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_user_by_verification_token(token: str) -> Optional[sqlite3.Row]:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE verification_token = ?", (token,)).fetchone()
+    conn.close()
+    return row
+
+
+def set_reset_token(user_id: int, token: str, expires: str):
+    conn = get_conn()
+    migrate_user_schema()
+    conn.execute("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?",
+                 (token, expires, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_user_by_reset_token(token: str) -> Optional[sqlite3.Row]:
+    conn = get_conn()
+    migrate_user_schema()
+    row = conn.execute("SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > datetime('now')",
+                       (token,)).fetchone()
+    conn.close()
+    return row
+
+
+def clear_reset_token(user_id: int):
+    conn = get_conn()
+    conn.execute("UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 
 def get_user_by_api_key(api_key: str) -> Optional[sqlite3.Row]:

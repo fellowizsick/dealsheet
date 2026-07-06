@@ -168,6 +168,10 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-[#1C1810] text-white/40 py-8 text-center text-sm">
         <p>© 2026 DealSheet. Built for real estate professionals.</p>
+        <div className="flex items-center justify-center gap-4 mt-2">
+          <Link href="/terms" className="hover:text-white/60 transition-colors">Terms</Link>
+          <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy</Link>
+        </div>
       </footer>
     </div>
   );
