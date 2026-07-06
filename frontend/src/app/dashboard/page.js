@@ -113,6 +113,7 @@ export default function DashboardPage() {
             <Link href="/" className="text-xs lg:text-sm text-[#8A8272] hover:text-[#1C1810]">Extract</Link>
             <Link href="/dashboard" className="text-xs lg:text-sm font-semibold text-[#1C1810]">Dashboard</Link>
             <Link href="/history" className="text-xs lg:text-sm text-[#8A8272] hover:text-[#1C1810]">History</Link>
+            <Link href="/landing#pricing" className="text-xs lg:text-sm font-semibold text-[#B5652B] hover:text-[#1C1810]">Upgrade</Link>
             <button onClick={() => { logout(); router.push("/login"); }}
               className="text-xs lg:text-sm text-[#A39C8E] hover:text-[#9B3A22] transition-colors font-medium whitespace-nowrap ml-1">Logout</button>
           </div>

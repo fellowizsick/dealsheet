@@ -46,8 +46,8 @@ if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
 PRICE_IDS = {
-    "pro": os.environ.get("STRIPE_PRO_PRICE_ID", ""),
-    "agency": os.environ.get("STRIPE_AGENCY_PRICE_ID", ""),
+    "pro": os.environ.get("STRIPE_PRO_PRICE_ID", "price_1TqJauGxy4Bq02M1Wa9dHqV1"),
+    "agency": os.environ.get("STRIPE_AGENCY_PRICE_ID", "price_1TqJawGxy4Bq02M1gqWXv9Yt"),
 }
 
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
