@@ -171,15 +171,34 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
+    # Verify signature — critical security check
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+    # Idempotency — deduplicate event IDs
+    conn = get_db_conn()
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS processed_events (event_id TEXT PRIMARY KEY, created_at TEXT DEFAULT (datetime('now')))"
+        )
+        conn.commit()
+    except Exception:
+        pass
+    existing = conn.execute(
+        "SELECT 1 FROM processed_events WHERE event_id = ?", (event["id"],)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return {"received": True, "duplicate": True}
+    conn.execute("INSERT OR IGNORE INTO processed_events (event_id) VALUES (?)", (event["id"],))
+    conn.commit()
+    conn.close()
+
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         user_id = int(session["metadata"]["user_id"])
-        # Mark user as subscribed - store Stripe customer ID
         conn = get_db_conn()
         conn.execute("UPDATE users SET stripe_customer_id = ? WHERE id = ?",
                      (session["customer"], user_id))
@@ -320,6 +339,9 @@ async def add_manual_deal(data: dict, user: dict = Depends(get_current_user)):
 async def underwrite_deal(extraction_id: int, body: UnderwritingInput, user: dict = Depends(get_current_user)):
     """Calculate underwriting metrics for a deal."""
     pp = body.purchase_price
+    if not pp or pp <= 0:
+        raise HTTPException(status_code=400, detail="Purchase price must be greater than 0")
+    
     dp = pp * (body.down_payment_percent / 100)
     total_cash = dp + body.closing_costs
 
@@ -330,10 +352,7 @@ async def underwrite_deal(extraction_id: int, body: UnderwritingInput, user: dic
     if loan > 0 and body.interest_rate > 0 and body.loan_term_years > 0:
         monthly_rate = (body.interest_rate / 100) / 12
         n_payments = body.loan_term_years * 12
-        if monthly_rate > 0:
-            debt_service = loan * (monthly_rate * (1 + monthly_rate) ** n_payments) / ((1 + monthly_rate) ** n_payments - 1)
-        else:
-            debt_service = loan / n_payments
+        debt_service = loan * (monthly_rate * (1 + monthly_rate) ** n_payments) / ((1 + monthly_rate) ** n_payments - 1)
         result.debt_service = round(debt_service, 2)
     else:
         result.debt_service = 0
@@ -342,26 +361,26 @@ async def underwrite_deal(extraction_id: int, body: UnderwritingInput, user: dic
     if body.monthly_rent and body.annual_expenses is not None:
         annual_rent = body.monthly_rent * 12
         noi = annual_rent - body.annual_expenses
-        result.noi = round(noi, 2)
+        result.noi = round(noi, 2) if noi else 0
 
         if pp > 0:
-            result.cap_rate = round((noi / pp) * 100, 2)
+            result.cap_rate = round((noi / pp) * 100, 2) if noi else 0
 
         annual_debt = (result.debt_service or 0) * 12
         annual_cash_flow = noi - annual_debt
-        result.monthly_cash_flow = round(annual_cash_flow / 12, 2)
+        result.monthly_cash_flow = round(annual_cash_flow / 12, 2) if annual_cash_flow else 0
 
         if total_cash > 0:
-            result.cash_on_cash_return = round((annual_cash_flow / total_cash) * 100, 2)
+            result.cash_on_cash_return = round((annual_cash_flow / total_cash) * 100, 2) if annual_cash_flow else 0
 
         result.total_cash_invested = round(total_cash, 2)
 
     # Flip analysis
     if body.rehab_cost is not None and body.after_repair_value is not None:
         flip_profit = body.after_repair_value - pp - body.rehab_cost
-        result.flip_profit = round(flip_profit, 2)
+        result.flip_profit = round(flip_profit, 2) if flip_profit else 0
         if body.after_repair_value > 0:
-            result.flip_margin = round((flip_profit / body.after_repair_value) * 100, 2)
+            result.flip_margin = round((flip_profit / body.after_repair_value) * 100, 2) if flip_profit else 0
 
     # Add total_cash_invested if not already set
     if result.total_cash_invested is None:

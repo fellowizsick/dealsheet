@@ -21,7 +21,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && !token) router.push("/login");
+    if (!authLoading && !token) router.push("/landing");
   }, [token, authLoading, router]);
 
   useEffect(() => {

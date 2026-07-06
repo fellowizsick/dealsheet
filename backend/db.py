@@ -155,7 +155,7 @@ def save_manual_deal(user_id: int, filename: str, result_json: str, status: str,
 
 
 def check_rate_limit(api_key: str, max_per_day: int = 50) -> bool:
-    """Returns True if under limit, False if over."""
+    """Returns True if under limit, False if over. Uses UTC day boundaries."""
     conn = get_conn()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     user = conn.execute(
