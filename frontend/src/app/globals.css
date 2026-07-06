@@ -315,6 +315,11 @@ html { scroll-behavior: smooth; }
 }
 
 /* Gradient text */
+/* SVG arrow animation */
+.stroke-dashoffset-0 {
+  stroke-dashoffset: 0;
+}
+
 .gradient-text {
   background: linear-gradient(135deg, #D98A4D, #D4A017, #B5652B);
   -webkit-background-clip: text;
