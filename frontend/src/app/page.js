@@ -99,11 +99,11 @@ export default function Home() {
   };
 
   const EditableField = ({ section, field, value, label }) => (
-    <div className="flex justify-between py-2.5 text-sm items-center group border-b border-[#F0EDE6] last:border-0">
-      <span className="text-[#8A8272] capitalize text-xs font-medium uppercase tracking-wider">{label || field.replace(/_/g, " ")}</span>
+    <div className="flex flex-col sm:flex-row sm:justify-between py-2.5 text-sm items-start sm:items-center group border-b border-[#F0EDE6] last:border-0">
+      <span className="text-[#8A8272] text-xs font-medium uppercase tracking-wider mb-1 sm:mb-0">{label || field.replace(/_/g, " ")}</span>
       {editing === `${section}.${field}` ? (
         <input
-          className="text-right border border-[#D98A4D]/40 rounded-xl px-3 py-1.5 text-sm w-48 focus:ring-2 focus:ring-[#D98A4D]/20 focus:border-[#D98A4D] outline-none bg-[#FAF9F6] text-[#1C1810]"
+          className="w-full sm:w-48 text-left sm:text-right border border-[#D98A4D]/40 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-[#D98A4D]/20 focus:border-[#D98A4D] outline-none bg-[#FAF9F6] text-[#1C1810]"
           value={value ?? ""}
           onChange={(e) => updateField(section, field, e.target.value)}
           onBlur={() => setEditing(null)}
@@ -111,7 +111,7 @@ export default function Home() {
         />
       ) : (
         <span
-          className="text-[#1C1810] font-medium cursor-pointer hover:bg-[#FAF9F6] px-3 py-1.5 rounded-xl transition-colors"
+          className="text-[#1C1810] font-medium cursor-pointer hover:bg-[#FAF9F6] px-3 py-2 rounded-xl transition-colors -ml-3"
           onClick={() => setEditing(`${section}.${field}`)}
         >
           {value ?? "—"}
@@ -129,60 +129,56 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
-      {/* Navbar */}
-      <nav className="bg-white/90 backdrop-blur-md border-b border-[#F0EDE6] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1C1810] to-[#B5652B] flex items-center justify-center text-white font-bold text-sm shadow-sm">D</div>
-            <span className="font-bold text-[#1C1810] text-lg tracking-tight">DealSheet</span>
+      {/* Mobile-first nav */}
+      <nav className="bg-white/95 backdrop-blur-md border-b border-[#F0EDE6] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-2.5 lg:py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg lg:rounded-xl bg-gradient-to-br from-[#1C1810] to-[#B5652B] flex items-center justify-center text-white font-bold text-xs lg:text-sm shadow-sm">D</div>
+            <span className="font-bold text-[#1C1810] text-base lg:text-lg tracking-tight">DealSheet</span>
           </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/" className="nav-link text-sm font-semibold text-[#1C1810] active after:!w-full">Extract</Link>
-            <Link href="/dashboard" className="nav-link text-sm text-[#8A8272] hover:text-[#1C1810]">Dashboard</Link>
-            <Link href="/history" className="nav-link text-sm text-[#8A8272] hover:text-[#1C1810]">History</Link>
-            <div className="h-6 w-px bg-[#F0EDE6] mx-1" />
-            <span className="text-xs text-[#A39C8E] hidden sm:inline font-medium truncate max-w-[120px]">{user?.email}</span>
+          <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
+            <Link href="/" className="text-xs lg:text-sm font-semibold text-[#1C1810]">Extract</Link>
+            <Link href="/dashboard" className="text-xs lg:text-sm text-[#8A8272] hover:text-[#1C1810]">Dashboard</Link>
+            <Link href="/history" className="text-xs lg:text-sm text-[#8A8272] hover:text-[#1C1810]">History</Link>
             <button onClick={() => { logout(); router.push("/login"); }}
-              className="text-sm text-[#A39C8E] hover:text-[#9B3A22] transition-colors font-medium">
-              Logout
-            </button>
+              className="text-xs lg:text-sm text-[#A39C8E] hover:text-[#9B3A22] transition-colors font-medium whitespace-nowrap ml-1">Logout</button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto p-4 lg:p-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <main className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-8">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
           {/* Left: Upload + PDF */}
-          <div className="w-full lg:w-1/2 space-y-4">
+          <div className="w-full lg:w-1/2 space-y-3 lg:space-y-4">
             <div>
-              <h1 className="text-2xl lg:text-3xl font-semibold text-[#1C1810] tracking-tight">Extract Deal Data</h1>
-              <p className="text-[#8A8272] text-sm mt-1">Upload a purchase agreement PDF to extract key details automatically.</p>
+              <h1 className="text-xl lg:text-3xl font-semibold text-[#1C1810] tracking-tight">Extract Deal Data</h1>
+              <p className="text-xs lg:text-sm text-[#8A8272] mt-0.5 lg:mt-1">Upload a purchase agreement PDF to extract key details automatically.</p>
             </div>
 
             {!fileUrl ? (
-              <div className="space-y-4">
+              <div className="space-y-3 lg:space-y-4">
                 <div
                   onDrop={handleDrop}
                   onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                   onDragLeave={() => setDragging(false)}
-                  className={`drop-zone border-2 border-dashed rounded-3xl p-12 lg:p-16 text-center bg-white cursor-pointer transition-all ${
+                  className={`drop-zone border-2 border-dashed rounded-2xl lg:rounded-3xl p-8 sm:p-10 lg:p-16 text-center bg-white cursor-pointer transition-all ${
                     dragging ? "dragging" : "border-[#E8E4DC]"
                   }`}
                   onClick={() => document.getElementById("file-input")?.click()}
                 >
                   <input id="file-input" type="file" accept=".pdf" className="hidden"
                     onChange={(e) => handleFileSelect(e.target.files?.[0] || null)} />
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1C1810]/5 to-[#B5652B]/10 flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">📄</span>
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-gradient-to-br from-[#1C1810]/5 to-[#B5652B]/10 flex items-center justify-center mx-auto mb-3 lg:mb-4">
+                    <span className="text-2xl lg:text-3xl">📄</span>
                   </div>
-                  <p className="text-[#1C1810] font-semibold mb-1">
+                  <p className="text-sm lg:text-base text-[#1C1810] font-semibold mb-1">
                     {isTouch
                       ? "Tap to select a PDF"
                       : dragging
                         ? "Drop your PDF here"
                         : "Drop a PDF here or click to browse"}
                   </p>
-                  <p className="text-[#A39C8E] text-sm">Supports standard residential purchase agreements</p>
+                  <p className="text-xs lg:text-sm text-[#A39C8E]">Supports standard residential purchase agreements</p>
                 </div>
                 <div className="text-center">
                   <span className="text-xs text-[#A39C8E]">No contract handy? </span>
@@ -197,33 +193,33 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-3xl elevated-shadow border border-[#F0EDE6] overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3.5 bg-[#FAF9F6] border-b border-[#F0EDE6]">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg">📄</span>
-                    <span className="font-medium text-sm truncate text-[#1C1810]">{file?.name}</span>
+              <div className="bg-white rounded-2xl lg:rounded-3xl elevated-shadow border border-[#F0EDE6] overflow-hidden">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 lg:py-3.5 bg-[#FAF9F6] border-b border-[#F0EDE6]">
+                  <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+                    <span className="text-base lg:text-lg">📄</span>
+                    <span className="font-medium text-xs lg:text-sm truncate text-[#1C1810] max-w-[120px] sm:max-w-[200px]">{file?.name}</span>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-1.5 lg:gap-2 shrink-0">
                     <button onClick={handleUpload} disabled={loading}
-                      className="btn-accent text-white px-5 py-2 rounded-2xl text-sm font-semibold disabled:opacity-40">
+                      className="btn-accent text-white px-3 lg:px-5 py-1.5 lg:py-2 rounded-xl lg:rounded-2xl text-xs lg:text-sm font-semibold disabled:opacity-40 min-h-[36px] lg:min-h-[44px]">
                       {loading ? (
-                        <span className="flex items-center gap-2">
-                          <div className="spinner !w-3.5 !h-3.5 !border-2 !border-white/30 !border-t-white" />
-                          Extracting
+                        <span className="flex items-center gap-1.5 lg:gap-2">
+                          <div className="spinner !w-3 !h-3 lg:!w-3.5 lg:!h-3.5 !border-2 !border-white/30 !border-t-white" />
+                          <span className="hidden sm:inline">Extracting</span>
                         </span>
                       ) : "Extract"}
                     </button>
                     {result && (
                       <button onClick={downloadCSV}
-                        className="bg-[#F0EDE6] text-[#453D30] px-4 py-2 rounded-2xl text-sm font-medium hover:bg-[#E8E4DC] transition-colors">
+                        className="bg-[#F0EDE6] text-[#453D30] px-3 lg:px-4 py-1.5 lg:py-2 rounded-xl lg:rounded-2xl text-xs lg:text-sm font-medium hover:bg-[#E8E4DC] transition-colors min-h-[36px] lg:min-h-[44px]">
                         CSV
                       </button>
                     )}
                     <button onClick={() => handleFileSelect(null)}
-                      className="text-[#A39C8E] hover:text-[#9B3A22] transition-colors px-2 text-lg">✕</button>
+                      className="text-[#A39C8E] hover:text-[#9B3A22] transition-colors px-1.5 lg:px-2 text-base lg:text-lg">✕</button>
                   </div>
                 </div>
-                <div className="h-[500px] lg:h-[600px] bg-[#FAF9F6]">
+                <div className="h-[60vh] max-h-[500px] lg:h-[600px] bg-[#FAF9F6]">
                   <iframe src={fileUrl} className="w-full h-full" title="PDF Preview" />
                 </div>
               </div>
@@ -231,42 +227,40 @@ export default function Home() {
           </div>
 
           {/* Right: Results */}
-          <div className="w-full lg:w-1/2 space-y-4">
-            <div className="h-0 lg:h-[52px]" />
-
+          <div className="w-full lg:w-1/2 space-y-3 lg:space-y-4">
             {error && (
-              <div className="bg-[#FBEEEC]/80 border border-[#E8C4BC] text-[#9B3A22] p-4 rounded-2xl text-sm flex items-start gap-3 animate-fade-in">
-                <span className="text-lg shrink-0 mt-0.5">⚠️</span>
+              <div className="bg-[#FBEEEC]/80 border border-[#E8C4BC] text-[#9B3A22] p-3 lg:p-4 rounded-2xl text-sm flex items-start gap-2 lg:gap-3 animate-fade-in">
+                <span className="text-base lg:text-lg shrink-0 mt-0.5">⚠️</span>
                 <span>{error}</span>
               </div>
             )}
 
             {loading && (
-              <div className="bg-white rounded-3xl elevated-shadow border border-[#F0EDE6] p-12 text-center animate-fade-in">
-                <div className="spinner mx-auto mb-4" />
-                <p className="text-[#453D30] font-medium">Analyzing contract...</p>
-                <p className="text-[#A39C8E] text-sm mt-1">Extracting parties, pricing, dates & contingencies</p>
+              <div className="bg-white rounded-2xl lg:rounded-3xl elevated-shadow border border-[#F0EDE6] p-8 lg:p-12 text-center animate-fade-in">
+                <div className="spinner mx-auto mb-3 lg:mb-4" />
+                <p className="text-[#453D30] font-medium text-sm lg:text-base">Analyzing contract...</p>
+                <p className="text-[#A39C8E] text-xs lg:text-sm mt-1">Extracting parties, pricing, dates & contingencies</p>
               </div>
             )}
 
             {editData && !loading && (
-              <div className="bg-white rounded-3xl elevated-shadow border border-[#F0EDE6] p-6 lg:p-8 animate-fade-in">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#B5652B]/10 to-[#D98A4D]/20 flex items-center justify-center">
-                      <span className="text-lg">✨</span>
+              <div className="bg-white rounded-2xl lg:rounded-3xl elevated-shadow border border-[#F0EDE6] p-4 sm:p-5 lg:p-8 animate-fade-in">
+                <div className="flex items-center justify-between mb-4 lg:mb-6">
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl bg-gradient-to-br from-[#B5652B]/10 to-[#D98A4D]/20 flex items-center justify-center">
+                      <span className="text-base lg:text-lg">✨</span>
                     </div>
-                    <h2 className="text-lg font-semibold text-[#1C1810] tracking-tight">Extracted Data</h2>
+                    <h2 className="text-base lg:text-lg font-semibold text-[#1C1810] tracking-tight">Extracted Data</h2>
                   </div>
                   {editing && (
                     <button onClick={() => setEditing(null)}
-                      className="text-xs text-[#B5652B] hover:text-[#96501F] font-medium bg-[#FAF9F6] px-3 py-1.5 rounded-2xl">
-                      Done editing
+                      className="text-xs text-[#B5652B] hover:text-[#96501F] font-medium bg-[#FAF9F6] px-2.5 lg:px-3 py-1.5 rounded-xl lg:rounded-2xl">
+                      Done
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-3 lg:space-y-5">
                   <Section title="Property">
                     <EditableField section="property" field="street_address" value={editData.property?.street_address} label="Address" />
                     <EditableField section="property" field="city" value={editData.property?.city} />
@@ -314,10 +308,10 @@ export default function Home() {
 
 function Section({ title, children }) {
   return (
-    <div className="section-card bg-[#FAF9F6] rounded-2xl p-4 border border-[#F0EDE6]">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-1 h-4 rounded-full bg-gradient-to-b from-[#1C1810] to-[#B5652B]" />
-        <h3 className="text-xs font-semibold text-[#453D30] uppercase tracking-wider">{title}</h3>
+    <div className="section-card bg-[#FAF9F6] rounded-xl lg:rounded-2xl p-3 lg:p-4 border border-[#F0EDE6]">
+      <div className="flex items-center gap-2 mb-2 lg:mb-3">
+        <div className="w-1 h-3 lg:h-4 rounded-full bg-gradient-to-b from-[#1C1810] to-[#B5652B]" />
+        <h3 className="text-[10px] lg:text-xs font-semibold text-[#453D30] uppercase tracking-wider">{title}</h3>
       </div>
       {children}
     </div>
