@@ -13,8 +13,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Real Estate Document Extractor",
-  description: "Upload purchase agreement PDFs to extract structured deal data.",
+  title: "DealSheet - Real Estate Contract Data Extractor",
+  description: "Upload purchase agreement PDFs to extract structured deal data in seconds.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DealSheet",
+  },
 };
 
 export default function RootLayout({ children }) {
