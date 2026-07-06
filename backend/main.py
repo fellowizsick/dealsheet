@@ -18,6 +18,22 @@ if SENTRY_DSN:
         environment=os.environ.get("ENVIRONMENT", "production"),
     )
 
+# PostHog — product analytics (opt-in via POSTHOG_API_KEY env var)
+import posthog
+POSTHOG_API_KEY = os.environ.get("POSTHOG_API_KEY")
+if POSTHOG_API_KEY:
+    posthog.project_api_key = POSTHOG_API_KEY
+    posthog.host = os.environ.get("POSTHOG_HOST", "https://app.posthog.com")
+
+
+def _capture(event: str, user_id: int, properties: dict = None):
+    """Send event to PostHog (no-op if not configured)."""
+    if POSTHOG_API_KEY:
+        try:
+            posthog.capture(str(user_id), event, properties=properties or {})
+        except Exception:
+            pass  # Don't let analytics break the app
+
 from schemas import ExtractionResponse, UnderwritingResult, UnderwritingInput
 from pdf_utils import extract_text_from_pdf, PDFTextExtractionError
 from extractor import extract_purchase_agreement, MODEL_NAME
@@ -39,9 +55,16 @@ app = FastAPI(
 )
 
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+# Allow both custom domain and Vercel preview domain
+ALLOWED_ORIGINS = [
+    FRONTEND_ORIGIN,
+    "https://dealsheet-three.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -111,12 +134,16 @@ class VerifyEmailRequest(BaseModel):
 async def signup(body: SignupRequest):
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    user = get_user_by_email(body.email)
+    if user:
+        raise HTTPException(status_code=409, detail="Email already registered")
     pwd_hash = hash_password(body.password)
     api_key = generate_api_key()
     user_id = create_user(body.email, pwd_hash, api_key)
     if user_id is None:
         raise HTTPException(status_code=409, detail="Email already registered")
     token = create_token(user_id)
+    _capture("user_signed_up", user_id, {"email": body.email})
     log_lead(body.email, source="signup", user_id=user_id)
     return AuthResponse(token=token, api_key=api_key, user_id=user_id, email=body.email)
 
@@ -127,6 +154,7 @@ async def login(body: LoginRequest):
     if not user or not verify_password(body.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_token(user["id"])
+    _capture("user_logged_in", user["id"])
     return AuthResponse(token=token, api_key=user["api_key"], user_id=user["id"], email=user["email"])
 
 
@@ -319,6 +347,7 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
         ends_at = canceled.current_period_end  # unix timestamp
         from db import set_subscription
         set_subscription(user["id"], "canceled", str(ends_at))
+        _capture("subscription_canceled", user["id"], {"ends_at": ends_at})
         return {
             "status": "canceled",
             "ends_at": ends_at,
@@ -471,7 +500,7 @@ async def get_sample_contract():
 
 
 # ---------------------------------------------------------------------------
-# Protected Endpoints
+# Extraction (sync — kept for small docs)
 # ---------------------------------------------------------------------------
 @app.post("/extract", response_model=ExtractionResponse)
 async def extract(file: UploadFile = File(...), user: dict = Depends(check_rate)):
@@ -482,11 +511,66 @@ async def extract(file: UploadFile = File(...), user: dict = Depends(check_rate)
     text = await _get_text(file)
     try:
         result = extract_purchase_agreement(text)
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    save_extraction(user["id"], file.filename or "unknown.pdf", result.model_dump_json())
-    increment_request_count(user["api_key"])
-    return result
+        extraction_id = save_extraction(user["id"], file.filename or "contract.pdf", result.model_dump_json())
+        _capture("extraction_completed", user["id"], {"filename": file.filename})
+        return result
+    except Exception as e:
+        _capture("extraction_failed", user["id"], {"error": str(e)})
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Extraction (async — background for large docs)
+# ---------------------------------------------------------------------------
+@app.post("/extract/async")
+async def extract_async(file: UploadFile = File(...), background_tasks: BackgroundTasks = None, user: dict = Depends(get_current_user)):
+    """Submit extraction to background job queue. Returns job_id for polling."""
+    uuid = __import__("uuid")
+    job_id = str(uuid.uuid4())
+    _validate_pdf(file)
+    content = await file.read()
+
+    from db import create_job
+    create_job(job_id, user["id"], file.filename or "contract.pdf")
+
+    # Run extraction in background
+    def run_extraction(jid, uid, data, fname):
+        from db import update_job, save_extraction
+        try:
+            from pdf_utils import extract_text_from_pdf
+            import io
+            text = extract_text_from_pdf(io.BytesIO(data))
+            result = extract_purchase_agreement(text)
+            save_extraction(uid, fname, result.model_dump_json())
+            update_job(jid, "completed", result.model_dump_json())
+            _capture("extraction_completed", uid, {"filename": fname})
+        except Exception as e:
+            update_job(jid, "failed", error=str(e))
+            _capture("extraction_failed", uid, {"error": str(e)})
+
+    if background_tasks:
+        background_tasks.add_task(run_extraction, job_id, user["id"], content, file.filename or "contract.pdf")
+    else:
+        # Fallback: run inline if no background tasks
+        run_extraction(job_id, user["id"], content, file.filename or "contract.pdf")
+
+    _capture("extraction_queued", user["id"], {"filename": file.filename})
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/extract/status/{job_id}")
+async def get_extraction_status(job_id: str, user: dict = Depends(get_current_user)):
+    """Poll extraction job status."""
+    from db import get_job
+    job = get_job(job_id, user["id"])
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    resp = {"status": job["status"], "job_id": job_id}
+    if job["status"] == "completed" and job["result_json"]:
+        resp["result"] = json.loads(job["result_json"])
+    if job["error"]:
+        resp["error"] = job["error"]
+    return resp
 
 
 @app.post("/extract/csv")

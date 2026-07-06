@@ -12,6 +12,7 @@
     "@sentry/nextjs": "^10.63.0",
     "next": "16.2.10",
     "pdfjs-dist": "^6.1.200",
+    "posthog-js": "^1.398.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-pdf": "^10.4.1",

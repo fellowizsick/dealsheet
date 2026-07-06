@@ -39,8 +39,20 @@ def init_db():
             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS extraction_jobs (
+            id          TEXT PRIMARY KEY,
+            user_id     INTEGER NOT NULL REFERENCES users(id),
+            filename    TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'queued',
+            result_json TEXT,
+            error       TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at TEXT
+        );
+
         CREATE INDEX IF NOT EXISTS idx_extractions_user ON extractions(user_id);
         CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
+        CREATE INDEX IF NOT EXISTS idx_jobs_user ON extraction_jobs(user_id);
     """)
     conn.commit()
     conn.close()
@@ -151,6 +163,37 @@ def clear_reset_token(user_id: int):
     conn.execute("UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()
+
+
+def create_job(job_id: str, user_id: int, filename: str) -> int:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO extraction_jobs (id, user_id, filename, status) VALUES (?, ?, ?, 'queued')",
+        (job_id, user_id, filename),
+    )
+    conn.commit()
+    conn.close()
+    return 1
+
+
+def update_job(job_id: str, status: str, result_json: str = None, error: str = None):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE extraction_jobs SET status = ?, result_json = ?, error = ?, completed_at = datetime('now') WHERE id = ?",
+        (status, result_json, error, job_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_job(job_id: str, user_id: int) -> Optional[sqlite3.Row]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM extraction_jobs WHERE id = ? AND user_id = ?",
+        (job_id, user_id),
+    ).fetchone()
+    conn.close()
+    return row
 
 
 def get_user_by_api_key(api_key: str) -> Optional[sqlite3.Row]:
