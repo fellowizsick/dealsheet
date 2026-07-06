@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --brand-navy: #1e3a5f;
+  --brand-emerald: #10b981;
+  --brand-dark: #0f172a;
+}
+
+/* Smooth scroll & transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Gradient animations */
+.brand-gradient {
+  background: linear-gradient(135deg, var(--brand-navy) 0%, #2d5a8e 50%, var(--brand-emerald) 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Glass morphism cards */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Fade in animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+/* Pulse glow for CTAs */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6); }
+}
+
+.glow-button {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Rich shadows */
+.rich-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.1);
+}
+
+/* DealSheet brand text */
+.text-brand {
+  color: var(--brand-navy);
+}
+
+.bg-brand {
+  background-color: var(--brand-navy);
+}
+
+.text-accent {
+  color: var(--brand-emerald);
+}
+
+.bg-accent {
+  background-color: var(--brand-emerald);
+}
+
+.border-accent {
+  border-color: var(--brand-emerald);
+}
