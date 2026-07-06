@@ -1,5 +1,4 @@
-import os
-import secrets
+import os, secrets, json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -8,7 +7,16 @@ import jwt
 from fastapi import HTTPException, Header
 from db import get_user_by_api_key, get_user_by_id
 
-SECRET_KEY = os.environ["JWT_SECRET"]  # REQUIRED — no fallback
+# JWT_SECRET — required from env. Fallback only for local dev.
+JWT_SECRET_FILE = os.path.join(os.path.dirname(__file__), ".jwt_secret")
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    if os.path.exists(JWT_SECRET_FILE):
+        SECRET_KEY = open(JWT_SECRET_FILE).read().strip()
+    else:
+        SECRET_KEY = secrets.token_hex(32)
+        with open(JWT_SECRET_FILE, "w") as f:
+            f.write(SECRET_KEY)
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
 
