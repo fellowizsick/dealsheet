@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../auth-context";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -30,10 +30,13 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, [token, authLoading, router]);
 
-  if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading...</div>;
+  if (authLoading || loading) return (
+    <div className="auth-gradient min-h-screen flex items-center justify-center">
+      <div className="spinner" />
+    </div>
+  );
   if (!token) return null;
 
-  // Chart data
   const monthlyData = {};
   const contingencyCounts = {};
   let totalValue = 0;
@@ -58,103 +61,122 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b px-6 py-3 flex items-center justify-between">
-        <Link href="/" className="font-bold text-[#1e3a5f] text-lg">DealSheet</Link>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-sm text-gray-600 hover:text-blue-600">Extract</Link>
-          <Link href="/dashboard" className="text-sm font-semibold text-blue-600">Dashboard</Link>
-          <Link href="/history" className="text-sm text-gray-600 hover:text-blue-600">History</Link>
-          <span className="text-xs text-gray-400 hidden sm:inline">{user?.email}</span>
-          <button onClick={() => { logout(); router.push("/login"); }} className="text-sm text-red-500 hover:text-red-700">Logout</button>
+      {/* Navbar */}
+      <nav className="bg-white/90 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1e3a5f] to-emerald-500 flex items-center justify-center text-white font-bold text-sm">
+              D
+            </div>
+            <span className="font-bold text-[#1e3a5f] text-lg">DealSheet</span>
+          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="nav-link text-sm text-gray-500 hover:text-gray-900">Extract</Link>
+            <Link href="/dashboard" className="nav-link text-sm font-semibold text-[#1e3a5f] active after:!w-full">Dashboard</Link>
+            <Link href="/history" className="nav-link text-sm text-gray-500 hover:text-gray-900">History</Link>
+            <div className="h-6 w-px bg-gray-200 mx-1" />
+            <span className="text-xs text-gray-400 hidden sm:inline font-medium">{user?.email}</span>
+            <button onClick={() => { logout(); router.push("/login"); }}
+              className="text-sm text-gray-400 hover:text-red-500 transition-colors font-medium">
+              Logout
+            </button>
+          </div>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto p-4 lg:p-8">
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <div className="max-w-7xl mx-auto p-4 lg:p-8">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a5f]/10 to-emerald-500/20 flex items-center justify-center">
+            <span className="text-lg">📊</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-sm text-gray-500">Your extraction activity at a glance</p>
+          </div>
+        </div>
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-5 rich-shadow">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Total Extractions</p>
-            <p className="text-3xl font-bold text-[#1e3a5f] mt-1">{extractions.length}</p>
+          <div className="stat-card rounded-2xl p-5 rich-shadow">
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Total Extractions</p>
+            <p className="text-3xl font-bold text-[#1e3a5f] mt-2">{extractions.length}</p>
           </div>
-          <div className="bg-white rounded-xl p-5 rich-shadow">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Total Deal Value</p>
-            <p className="text-3xl font-bold text-emerald-600 mt-1">${(totalValue / 1000000).toFixed(1)}M</p>
+          <div className="stat-card rounded-2xl p-5 rich-shadow">
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Total Deal Value</p>
+            <p className="text-3xl font-bold text-emerald-600 mt-2">${(totalValue / 1000000).toFixed(1)}M</p>
           </div>
-          <div className="bg-white rounded-xl p-5 rich-shadow">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Avg Price</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
+          <div className="stat-card rounded-2xl p-5 rich-shadow">
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Avg Price</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
               ${extractions.length ? (totalValue / extractions.length / 1000).toFixed(0) : 0}K
             </p>
           </div>
-          <div className="bg-white rounded-xl p-5 rich-shadow">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">This Month</p>
-            <p className="text-3xl font-bold text-blue-600 mt-1">{monthlyChart.length > 0 ? monthlyChart[monthlyChart.length - 1].count : 0}</p>
+          <div className="stat-card rounded-2xl p-5 rich-shadow">
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">This Month</p>
+            <p className="text-3xl font-bold text-blue-600 mt-2">{monthlyChart.length > 0 ? monthlyChart[monthlyChart.length - 1].count : 0}</p>
           </div>
         </div>
 
         {/* Charts */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {/* Monthly extraction volume */}
-          <div className="bg-white rounded-xl p-6 rich-shadow">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Extractions Over Time</h2>
+          <div className="section-card bg-white rounded-2xl p-6 rich-shadow border border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">Extractions Over Time</h2>
             {monthlyChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={monthlyChart}>
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#1e3a5f" radius={[4, 4, 0, 0]} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
+                  <Bar dataKey="count" fill="#1e3a5f" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-sm text-center py-12">No data yet</p>
+              <p className="text-gray-400 text-sm text-center py-16">No data yet</p>
             )}
           </div>
 
-          {/* Contingency breakdown */}
-          <div className="bg-white rounded-xl p-6 rich-shadow">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Contingency Types</h2>
+          <div className="section-card bg-white rounded-2xl p-6 rich-shadow border border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">Contingency Types</h2>
             {contingencyChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
-                  <Pie data={contingencyChart} cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  <Pie data={contingencyChart} cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                     {contingencyChart.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-sm text-center py-12">No data yet</p>
+              <p className="text-gray-400 text-sm text-center py-16">No data yet</p>
             )}
           </div>
         </div>
 
         {/* Recent extractions */}
-        <div className="bg-white rounded-xl rich-shadow">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-sm font-semibold text-gray-700">Recent Extractions</h2>
+        <div className="section-card bg-white rounded-2xl rich-shadow border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+            <span className="text-sm">📋</span>
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Recent Extractions</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y divide-gray-50">
             {extractions.slice(0, 5).map((e) => (
-              <div key={e.id} className="px-6 py-3 flex items-center justify-between text-sm">
-                <div>
-                  <p className="font-medium text-gray-900">{e.filename}</p>
-                  <p className="text-xs text-gray-400">{e.result?.property?.street_address || "—"}</p>
+              <div key={e.id} className="px-6 py-4 flex items-center justify-between text-sm hover:bg-gray-50/50 transition-colors">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{e.filename}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{e.result?.property?.street_address || "—"}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0 ml-4">
                   {e.result?.financial_terms?.purchase_price && (
-                    <p className="font-semibold">${Number(e.result.financial_terms.purchase_price).toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900">${Number(e.result.financial_terms.purchase_price).toLocaleString()}</p>
                   )}
-                  <p className="text-xs text-gray-400">{new Date(e.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{new Date(e.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
             ))}
             {extractions.length === 0 && (
-              <p className="px-6 py-8 text-gray-400 text-sm text-center">No extractions yet</p>
+              <p className="px-6 py-12 text-gray-400 text-sm text-center">No extractions yet. <Link href="/" className="text-emerald-600 hover:underline font-medium">Extract your first document →</Link></p>
             )}
           </div>
         </div>
