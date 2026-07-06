@@ -68,6 +68,43 @@ def get_user_by_email(email: str) -> Optional[sqlite3.Row]:
     return row
 
 
+def migrate_user_schema():
+    """Add subscription columns if they don't exist yet."""
+    conn = get_conn()
+    for col in ["subscription_status", "subscription_ends_at"]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT NULL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # already exists
+    conn.close()
+
+
+def set_subscription(user_id: int, status: str, ends_at: str = None):
+    """status: 'active', 'canceled', 'past_due', or None for free."""
+    conn = get_conn()
+    migrate_user_schema()
+    conn.execute(
+        "UPDATE users SET subscription_status = ?, subscription_ends_at = ? WHERE id = ?",
+        (status, ends_at, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_subscription(user_id: int) -> dict:
+    conn = get_conn()
+    migrate_user_schema()
+    row = conn.execute(
+        "SELECT subscription_status, subscription_ends_at FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    if row and row["subscription_status"]:
+        return {"status": row["subscription_status"], "ends_at": row["subscription_ends_at"]}
+    return {"status": None, "ends_at": None}
+
+
 def get_user_by_api_key(api_key: str) -> Optional[sqlite3.Row]:
     conn = get_conn()
     row = conn.execute("SELECT * FROM users WHERE api_key = ?", (api_key,)).fetchone()

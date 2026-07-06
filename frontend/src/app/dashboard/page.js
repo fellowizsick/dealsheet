@@ -30,6 +30,9 @@ export default function DashboardPage() {
   const [pipelineStats, setPipelineStats] = useState({ active: 0, under_contract: 0, closed: 0, archived: 0, total: 0 });
   const [showManual, setShowManual] = useState(false);
   const [underwritingDeal, setUnderwritingDeal] = useState(null);
+  const [subInfo, setSubInfo] = useState(null);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState(null);
   const { user, token, logout, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -42,10 +45,12 @@ export default function DashboardPage() {
     Promise.all([
       fetch(`${API}/extractions`, { headers }).then((r) => r.json()),
       fetch(`${API}/pipeline/stats`, { headers }).then((r) => r.json()),
+      fetch(`${API}/stripe/subscription`, { headers }).then((r) => r.json()).catch(() => null),
     ])
-      .then(([extractionsData, stats]) => {
+      .then(([extractionsData, stats, sub]) => {
         setExtractions(extractionsData.map((e) => ({ ...e, result: JSON.parse(e.result_json) })));
         setPipelineStats(stats);
+        setSubInfo(sub);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -102,6 +107,28 @@ export default function DashboardPage() {
   STATUSES.forEach((s) => { dealsByStatus[s.key] = extractions.filter((e) => (e.status || "active") === s.key); });
   
   const hasNoDeals = extractions.length === 0;
+  
+  const handleCancel = async () => {
+    if (!confirm("Cancel your subscription? You'll keep access until the end of your billing period.")) return;
+    setCanceling(true);
+    setCancelMsg(null);
+    try {
+      const r = await fetch(`${API}/stripe/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setCancelMsg({ type: "success", text: data.message });
+        setSubInfo((prev) => ({ ...prev, status: "canceled", cancel_at_period_end: true, current_period_end: data.ends_at }));
+      } else {
+        setCancelMsg({ type: "error", text: data.detail || "Cancel failed" });
+      }
+    } catch {
+      setCancelMsg({ type: "error", text: "Something went wrong" });
+    }
+    setCanceling(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
@@ -183,6 +210,51 @@ export default function DashboardPage() {
                 Save Deal
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Subscription Status */}
+        {subInfo && subInfo.status !== "free" && (
+          <div className="bg-white rounded-xl p-4 lg:p-5 border border-[#F0EDE6] mb-4 lg:mb-6 animate-fade-in">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#B5652B]/10 to-[#D98A4D]/20 flex items-center justify-center">
+                  <span className="text-sm">{subInfo.status === "canceled" ? "⏳" : "⭐"}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1C1810]">
+                    {subInfo.status === "canceled" ? "Subscription Canceled" : `${subInfo.plan === "agency" ? "Agency" : "Pro"} Plan`}
+                  </p>
+                  <p className="text-xs text-[#A39C8E]">
+                    {subInfo.status === "canceled"
+                      ? `Access until ${subInfo.current_period_end ? new Date(subInfo.current_period_end * 1000).toLocaleDateString() : "period end"}`
+                      : subInfo.cancel_at_period_end
+                        ? `Ends ${subInfo.current_period_end ? new Date(subInfo.current_period_end * 1000).toLocaleDateString() : "soon"}`
+                        : "Active · billed monthly"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {subInfo.status !== "canceled" && !subInfo.cancel_at_period_end && (
+                  <button onClick={handleCancel} disabled={canceling}
+                    className="text-xs px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors">
+                    {canceling ? "Canceling..." : "Cancel"}
+                  </button>
+                )}
+                <a href={`${API}/stripe/portal`} onClick={(e) => {
+                  e.preventDefault();
+                  fetch(`${API}/stripe/portal`, { headers: { Authorization: `Bearer ${token}` } })
+                    .then(r => r.json()).then(d => { if (d.url) window.location.href = d.url; });
+                }} className="text-xs px-3 py-1.5 rounded-xl border border-[#E8E4DC] text-[#453D30] hover:bg-[#FAF9F6] transition-colors">
+                  Billing
+                </a>
+              </div>
+            </div>
+            {cancelMsg && (
+              <div className={`mt-3 text-xs px-3 py-2 rounded-xl ${cancelMsg.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}>
+                {cancelMsg.text}
+              </div>
+            )}
           </div>
         )}
 

@@ -163,6 +163,72 @@ async def billing_portal(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="No Stripe customer found. Subscribe first.")
 
 
+@app.post("/stripe/cancel")
+async def cancel_subscription(user: dict = Depends(get_current_user)):
+    """Cancel subscription at period end. User keeps access until period expires."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=400, detail="Stripe not configured")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No active subscription found")
+
+    try:
+        # Find the user's active subscriptions
+        subs = stripe.Subscription.list(customer=customer_id, status="active", limit=1)
+        if not subs.data:
+            raise HTTPException(status_code=400, detail="No active subscription found")
+
+        sub = subs.data[0]
+        # Cancel at period end — user keeps access until the current period finishes
+        canceled = stripe.Subscription.update(
+            sub.id,
+            cancel_at_period_end=True,
+        )
+        ends_at = canceled.current_period_end  # unix timestamp
+        from db import set_subscription
+        set_subscription(user["id"], "canceled", str(ends_at))
+        return {
+            "status": "canceled",
+            "ends_at": ends_at,
+            "message": "Subscription canceled. You'll keep access until your billing period ends.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/stripe/subscription")
+async def get_subscription_status(user: dict = Depends(get_current_user)):
+    """Get current subscription status for the user."""
+    from db import get_subscription, get_db_conn
+    import stripe
+
+    # Check Stripe directly for the most accurate state
+    customer_id = user.get("stripe_customer_id")
+    if customer_id and STRIPE_SECRET_KEY:
+        try:
+            subs = stripe.Subscription.list(customer=customer_id, limit=1)
+            if subs.data:
+                sub = subs.data[0]
+                return {
+                    "status": sub.status,
+                    "cancel_at_period_end": sub.cancel_at_period_end,
+                    "current_period_end": sub.current_period_end,
+                    "plan": sub.items.data[0].price.nickname if sub.items.data[0].price.nickname else "pro",
+                }
+        except Exception:
+            pass
+
+    # Fall back to local DB
+    info = get_subscription(user["id"])
+    return {
+        "status": info["status"] or "free",
+        "cancel_at_period_end": info["status"] == "canceled",
+        "current_period_end": info["ends_at"],
+        "plan": "free",
+    }
+
+
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     if not STRIPE_WEBHOOK_SECRET:
@@ -203,6 +269,42 @@ async def stripe_webhook(request: Request):
         conn.execute("UPDATE users SET stripe_customer_id = ? WHERE id = ?",
                      (session["customer"], user_id))
         conn.commit()
+        conn.close()
+        from db import set_subscription
+        set_subscription(user_id, "active")
+
+    elif event["type"] == "customer.subscription.updated":
+        sub = event["data"]["object"]
+        user_id = None
+        # Find user by Stripe customer ID
+        conn = get_db_conn()
+        row = conn.execute(
+            "SELECT id FROM users WHERE stripe_customer_id = ?",
+            (sub["customer"],)
+        ).fetchone()
+        if row:
+            user_id = row["id"]
+            status = sub["status"]  # 'active', 'past_due', 'canceled', 'incomplete', etc.
+            ends_at = sub.get("current_period_end")
+            from db import set_subscription
+            if status == "canceled" or sub.get("cancel_at_period_end"):
+                set_subscription(user_id, "canceled", str(ends_at) if ends_at else None)
+            elif status == "active":
+                set_subscription(user_id, "active", str(ends_at) if ends_at else None)
+            else:
+                set_subscription(user_id, status, str(ends_at) if ends_at else None)
+        conn.close()
+
+    elif event["type"] == "customer.subscription.deleted":
+        sub = event["data"]["object"]
+        conn = get_db_conn()
+        row = conn.execute(
+            "SELECT id FROM users WHERE stripe_customer_id = ?",
+            (sub["customer"],)
+        ).fetchone()
+        if row:
+            from db import set_subscription
+            set_subscription(row["id"], None)  # back to free
         conn.close()
 
     return {"received": True}
