@@ -16,6 +16,7 @@ export default function Home() {
   const [editData, setEditData] = useState(null);
   const [error, setError] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [isTouch] = useState(() => typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0));
   const { user, token, logout, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -174,7 +175,13 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1C1810]/5 to-[#B5652B]/10 flex items-center justify-center mx-auto mb-4">
                     <span className="text-3xl">📄</span>
                   </div>
-                  <p className="text-[#1C1810] font-semibold mb-1">{dragging ? "Drop your PDF here" : "Drop a PDF here or click to browse"}</p>
+                  <p className="text-[#1C1810] font-semibold mb-1">
+                    {isTouch
+                      ? "Tap to select a PDF"
+                      : dragging
+                        ? "Drop your PDF here"
+                        : "Drop a PDF here or click to browse"}
+                  </p>
                   <p className="text-[#A39C8E] text-sm">Supports standard residential purchase agreements</p>
                 </div>
                 <div className="text-center">
