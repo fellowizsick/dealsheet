@@ -38,53 +38,56 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-gradient min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative blobs */}
-      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[100px]" />
-      <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] rounded-full bg-blue-500/10 blur-[80px]" />
+    <div className="auth-gradient min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      {/* Noise texture */}
+      <div className="noise-overlay absolute inset-0" />
 
-      <div className="glass-card-solid rounded-2xl elevated-shadow w-full max-w-md p-8 lg:p-10 animate-fade-in relative z-10">
+      {/* Decorative blobs */}
+      <div className="auth-blob absolute top-[-15%] left-[-10%] rounded-full bg-[#D98A4D]/8 blur-[100px]" />
+      <div className="auth-blob absolute bottom-[-20%] right-[-10%] rounded-full bg-[#5C3413]/10 blur-[80px]" />
+
+      <div className="glass-card-solid rounded-3xl elevated-shadow w-full max-w-md p-6 sm:p-8 lg:p-10 animate-fade-in relative z-10">
         {/* Brand header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a5f] to-emerald-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+          <Link href="/" className="inline-flex items-center gap-2 mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#1C1810] to-[#B5652B] flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-[#B5652B]/20">
               D
             </div>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-          <p className="text-gray-500 text-sm mt-1">Sign in to your DealSheet account</p>
+          <h1 className="text-2xl lg:text-3xl font-semibold text-[#1C1810] tracking-tight">Welcome back</h1>
+          <p className="text-[#8A8272] text-sm mt-1.5">Sign in to your DealSheet account</p>
         </div>
 
         {error && (
-          <div className="bg-red-50/80 border border-red-200 text-red-700 p-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-fade-in">
-            <span className="text-lg">⚠️</span>
+          <div className="bg-[#FBEEEC]/80 border border-[#E8C4BC] text-[#9B3A22] p-3.5 rounded-2xl mb-6 text-sm flex items-start gap-3 animate-fade-in">
+            <span className="text-lg shrink-0 mt-0.5">⚠️</span>
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-[#453D30] mb-1.5">
               Email
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="input-modern w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white/50 outline-none"
+              className="input-modern w-full border border-[#E8E4DC] rounded-2xl px-4 py-3.5 text-base bg-[#FAF9F6]/60 outline-none text-[#1C1810] placeholder:text-[#A39C8E]"
               placeholder="you@example.com"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-[#453D30] mb-1.5">
               Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="input-modern w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white/50 outline-none"
+              className="input-modern w-full border border-[#E8E4DC] rounded-2xl px-4 py-3.5 text-base bg-[#FAF9F6]/60 outline-none text-[#1C1810] placeholder:text-[#A39C8E]"
               placeholder="••••••••"
               required
             />
@@ -92,7 +95,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-accent w-full text-white py-3.5 rounded-xl font-semibold text-sm disabled:opacity-40"
+            className="btn-accent w-full text-white py-3.5 rounded-2xl font-semibold text-sm disabled:opacity-40"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -105,16 +108,15 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-sm text-gray-500 text-center mt-6">
+        <p className="text-sm text-[#8A8272] text-center mt-6">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-emerald-600 hover:text-emerald-700 font-medium hover:underline">
+          <Link href="/signup" className="text-[#B5652B] hover:text-[#96501F] font-medium hover:underline">
             Create one
           </Link>
         </p>
 
-        {/* Decorative footer */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <p className="text-xs text-gray-400 text-center">
+        <div className="mt-8 pt-6 border-t border-[#F0EDE6]">
+          <p className="text-xs text-[#A39C8E] text-center">
             Secured with industry-standard encryption
           </p>
         </div>
