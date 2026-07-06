@@ -3,11 +3,13 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "app.db")
+DB_PATH = os.path.join(os.environ.get("DATA_DIR", os.path.dirname(__file__)), "data", "app.db")
 
 
 def get_conn() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    data_dir = os.path.dirname(DB_PATH)
+    if data_dir:
+        os.makedirs(data_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
