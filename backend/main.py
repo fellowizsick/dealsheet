@@ -14,6 +14,7 @@ from extractor import extract_purchase_agreement, MODEL_NAME
 from csv_utils import result_to_csv_row, results_to_csv_bytes
 from db import init_db, create_user, get_user_by_email, get_user_by_id, save_extraction, get_user_extractions, check_rate_limit, increment_request_count
 from auth import hash_password, verify_password, generate_api_key, create_token, get_current_user
+from leads import log_lead
 
 # ---------------------------------------------------------------------------
 # App Setup
@@ -90,6 +91,7 @@ async def signup(body: SignupRequest):
     if user_id is None:
         raise HTTPException(status_code=409, detail="Email already registered")
     token = create_token(user_id)
+    log_lead(body.email, source="signup", user_id=user_id)
     return AuthResponse(token=token, api_key=api_key, user_id=user_id, email=body.email)
 
 
