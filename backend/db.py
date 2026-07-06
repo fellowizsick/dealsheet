@@ -34,6 +34,8 @@ def init_db():
             user_id     INTEGER NOT NULL REFERENCES users(id),
             filename    TEXT NOT NULL,
             result_json TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'active',
+            tags        TEXT DEFAULT '',
             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -99,6 +101,57 @@ def get_user_extractions(user_id: int, limit: int = 50) -> list:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def update_extraction_status(extraction_id: int, user_id: int, status: str) -> bool:
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE extractions SET status = ? WHERE id = ? AND user_id = ?",
+        (status, extraction_id, user_id),
+    )
+    conn.commit()
+    ok = cur.rowcount > 0
+    conn.close()
+    return ok
+
+
+def update_extraction_tags(extraction_id: int, user_id: int, tags: str) -> bool:
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE extractions SET tags = ? WHERE id = ? AND user_id = ?",
+        (tags, extraction_id, user_id),
+    )
+    conn.commit()
+    ok = cur.rowcount > 0
+    conn.close()
+    return ok
+
+
+def get_pipeline_stats(user_id: int) -> dict:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT status, COUNT(*) as count FROM extractions WHERE user_id = ? GROUP BY status",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    stats = {r["status"]: r["count"] for r in rows}
+    return {
+        "active": stats.get("active", 0),
+        "under_contract": stats.get("under_contract", 0),
+        "closed": stats.get("closed", 0),
+        "archived": stats.get("archived", 0),
+        "total": sum(stats.values()),
+    }
+
+
+def save_manual_deal(user_id: int, filename: str, result_json: str, status: str, tags: str):
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO extractions (user_id, filename, result_json, status, tags) VALUES (?, ?, ?, ?, ?)",
+        (user_id, filename, result_json, status, tags),
+    )
+    conn.commit()
+    conn.close()
 
 
 def check_rate_limit(api_key: str, max_per_day: int = 50) -> bool:

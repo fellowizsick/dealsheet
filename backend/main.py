@@ -279,6 +279,37 @@ async def list_extractions(user: dict = Depends(get_current_user)):
     return get_user_extractions(user["id"])
 
 
+@app.patch("/extractions/{extraction_id}/status")
+async def update_status(extraction_id: int, status: str, user: dict = Depends(get_current_user)):
+    from db import update_extraction_status
+    ok = update_extraction_status(extraction_id, user["id"], status)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    return {"ok": True}
+
+
+@app.patch("/extractions/{extraction_id}/tags")
+async def update_tags(extraction_id: int, tags: str, user: dict = Depends(get_current_user)):
+    from db import update_extraction_tags
+    ok = update_extraction_tags(extraction_id, user["id"], tags)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    return {"ok": True}
+
+
+@app.get("/pipeline/stats")
+async def pipeline_stats(user: dict = Depends(get_current_user)):
+    from db import get_pipeline_stats
+    return get_pipeline_stats(user["id"])
+
+
+@app.post("/pipeline/manual-deal")
+async def add_manual_deal(data: dict, user: dict = Depends(get_current_user)):
+    from db import save_manual_deal
+    save_manual_deal(user["id"], data.get("filename", "Manual Deal"), json.dumps(data.get("result", {})), data.get("status", "active"), data.get("tags", ""))
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
