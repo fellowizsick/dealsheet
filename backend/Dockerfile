@@ -9,5 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY backend/ .
 
-# Expose port
+# Entrypoint handles PORT expansion with proper signal handling
+COPY backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]
