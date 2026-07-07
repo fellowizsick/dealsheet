@@ -75,7 +75,7 @@ RATE_LIMIT_PER_DAY = int(os.environ.get("RATE_LIMIT_PER_DAY", "50"))
 BASE_DIR = Path(__file__).parent
 
 # Stripe
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
@@ -84,7 +84,7 @@ PRICE_IDS = {
     "agency": os.environ.get("STRIPE_AGENCY_PRICE_ID", "price_1TqJawGxy4Bq02M1gqWXv9Yt"),
 }
 
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 
 
 # ---------------------------------------------------------------------------
