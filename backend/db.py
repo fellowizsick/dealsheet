@@ -1,356 +1,353 @@
-import sqlite3
+"""Supabase/Postgres database layer for DealSheet."""
 import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime, timezone
 from typing import Optional
 
-DB_PATH = os.path.join(os.environ.get("DATA_DIR", os.path.dirname(__file__)), "data", "app.db")
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.bfolwcqzxleympwshmju:DealSheetDB2026!@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+)
 
 
-def get_conn() -> sqlite3.Connection:
-    data_dir = os.path.dirname(DB_PATH)
-    if data_dir:
-        os.makedirs(data_dir, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+def get_pool():
+    """Simple direct connection (pooling handled by Supabase pgBouncer)."""
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode="require")
+
+
+# Alias for backwards compatibility with main.py
+get_conn = get_pool
 
 
 def init_db():
-    conn = get_conn()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            email       TEXT UNIQUE NOT NULL,
-            password    TEXT NOT NULL,
-            api_key     TEXT UNIQUE NOT NULL,
-            stripe_customer_id TEXT,
-            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-            requests_month INTEGER DEFAULT 0,
-            last_month_date TEXT
-        );
-
-        -- Migrate old daily columns to monthly
-        ALTER TABLE users ADD COLUMN requests_month INTEGER DEFAULT 0;
-        ALTER TABLE users ADD COLUMN last_month_date TEXT;
-
-        CREATE TABLE IF NOT EXISTS extractions (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL REFERENCES users(id),
-            filename    TEXT NOT NULL,
-            result_json TEXT NOT NULL,
-            status      TEXT NOT NULL DEFAULT 'active',
-            tags        TEXT DEFAULT '',
-            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS extraction_jobs (
-            id          TEXT PRIMARY KEY,
-            user_id     INTEGER NOT NULL REFERENCES users(id),
-            filename    TEXT NOT NULL,
-            status      TEXT NOT NULL DEFAULT 'queued',
-            result_json TEXT,
-            error       TEXT,
-            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-            completed_at TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_extractions_user ON extractions(user_id);
-        CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
-        CREATE INDEX IF NOT EXISTS idx_jobs_user ON extraction_jobs(user_id);
-    """)
-    conn.commit()
-    conn.close()
+    """Tables already created via migration. This is a no-op for new Postgres."""
+    pass
 
 
-def create_user(email: str, password_hash: str, api_key: str) -> int:
-    conn = get_conn()
+def create_user(email: str, password_hash: str, api_key: str) -> Optional[int]:
+    conn = get_pool()
     try:
-        cur = conn.execute(
-            "INSERT INTO users (email, password, api_key) VALUES (?, ?, ?)",
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO users (email, password, api_key) VALUES (%s, %s, %s) RETURNING id",
             (email, password_hash, api_key),
         )
+        user_id = cur.fetchone()["id"]
         conn.commit()
-        return cur.lastrowid
-    except sqlite3.IntegrityError:
+        return user_id
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
         return None
     finally:
         conn.close()
 
 
-def get_user_by_email(email: str) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    conn.close()
-    return row
+def get_user_by_email(email: str) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id: int) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_user_by_api_key(api_key: str) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def migrate_user_schema():
-    """Add subscription & email columns if they don't exist yet."""
-    conn = get_conn()
-    for col in ["subscription_status", "subscription_ends_at", "is_verified", "verification_token", "reset_token", "reset_token_expires"]:
-        try:
-            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT NULL")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # already exists
-    conn.close()
+    """Schema already created. No-op stub for compatibility."""
+    pass
 
 
 def set_subscription(user_id: int, status: str, ends_at: str = None):
-    """status: 'active', 'canceled', 'past_due', or None for free."""
-    conn = get_conn()
-    migrate_user_schema()
-    conn.execute(
-        "UPDATE users SET subscription_status = ?, subscription_ends_at = ? WHERE id = ?",
-        (status, ends_at, user_id),
-    )
-    conn.commit()
-    conn.close()
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET subscription_status = %s, subscription_ends_at = %s WHERE id = %s",
+            (status, ends_at, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_subscription(user_id: int) -> dict:
-    conn = get_conn()
-    migrate_user_schema()
-    row = conn.execute(
-        "SELECT subscription_status, subscription_ends_at FROM users WHERE id = ?",
-        (user_id,),
-    ).fetchone()
-    conn.close()
-    if row and row["subscription_status"]:
-        return {"status": row["subscription_status"], "ends_at": row["subscription_ends_at"]}
-    return {"status": None, "ends_at": None}
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT subscription_status, subscription_ends_at FROM users WHERE id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if row and row.get("subscription_status"):
+            return {"status": row["subscription_status"], "ends_at": row.get("subscription_ends_at")}
+        return {"status": None, "ends_at": None}
+    finally:
+        conn.close()
 
 
 def set_verified(user_id: int):
-    conn = get_conn()
-    migrate_user_schema()
-    conn.execute("UPDATE users SET is_verified = '1', verification_token = NULL WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET is_verified = '1', verification_token = NULL WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def set_verification_token(user_id: int, token: str):
-    conn = get_conn()
-    migrate_user_schema()
-    conn.execute("UPDATE users SET verification_token = ? WHERE id = ?", (token, user_id))
-    conn.commit()
-    conn.close()
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET verification_token = %s WHERE id = %s", (token, user_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def get_user_by_verification_token(token: str) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE verification_token = ?", (token,)).fetchone()
-    conn.close()
-    return row
+def get_user_by_verification_token(token: str) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE verification_token = %s", (token,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def set_reset_token(user_id: int, token: str, expires: str):
-    conn = get_conn()
-    migrate_user_schema()
-    conn.execute("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?",
-                 (token, expires, user_id))
-    conn.commit()
-    conn.close()
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET reset_token = %s, reset_token_expires = %s WHERE id = %s",
+            (token, expires, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def get_user_by_reset_token(token: str) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    migrate_user_schema()
-    row = conn.execute("SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > datetime('now')",
-                       (token,)).fetchone()
-    conn.close()
-    return row
+def get_user_by_reset_token(token: str) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM users WHERE reset_token = %s AND reset_token_expires > NOW()",
+            (token,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def clear_reset_token(user_id: int):
-    conn = get_conn()
-    conn.execute("UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def create_job(job_id: str, user_id: int, filename: str) -> int:
-    conn = get_conn()
-    conn.execute(
-        "INSERT INTO extraction_jobs (id, user_id, filename, status) VALUES (?, ?, ?, 'queued')",
-        (job_id, user_id, filename),
-    )
-    conn.commit()
-    conn.close()
-    return 1
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO extraction_jobs (id, user_id, filename, status) VALUES (%s, %s, %s, 'queued')",
+            (job_id, user_id, filename),
+        )
+        conn.commit()
+        return 1
+    finally:
+        conn.close()
 
 
-def update_job(job_id: str, status: str, result_json: str = None, error: str = None):
-    conn = get_conn()
-    conn.execute(
-        "UPDATE extraction_jobs SET status = ?, result_json = ?, error = ?, completed_at = datetime('now') WHERE id = ?",
-        (status, result_json, error, job_id),
-    )
-    conn.commit()
-    conn.close()
+def update_job(job_id: str, status: str, result_json: str = None):
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        if result_json:
+            cur.execute(
+                "UPDATE extraction_jobs SET status = %s, result_json = %s, completed_at = NOW() WHERE id = %s",
+                (status, result_json, job_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE extraction_jobs SET status = %s, completed_at = NOW() WHERE id = %s",
+                (status, job_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def get_job(job_id: str, user_id: int) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM extraction_jobs WHERE id = ? AND user_id = ?",
-        (job_id, user_id),
-    ).fetchone()
-    conn.close()
-    return row
-
-
-def get_user_by_api_key(api_key: str) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE api_key = ?", (api_key,)).fetchone()
-    conn.close()
-    return row
-
-
-def get_user_by_id(user_id: int) -> Optional[sqlite3.Row]:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    conn.close()
-    return row
+def get_job(job_id: str) -> Optional[dict]:
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM extraction_jobs WHERE id = %s", (job_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def save_extraction(user_id: int, filename: str, result_json: str) -> int:
-    conn = get_conn()
-    cur = conn.execute(
-        "INSERT INTO extractions (user_id, filename, result_json) VALUES (?, ?, ?)",
-        (user_id, filename, result_json),
-    )
-    conn.commit()
-    conn.close()
-    return cur.lastrowid
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO extractions (user_id, filename, result_json) VALUES (%s, %s, %s) RETURNING id",
+            (user_id, filename, result_json),
+        )
+        ext_id = cur.fetchone()["id"]
+        conn.commit()
+        return ext_id
+    finally:
+        conn.close()
 
 
 def get_user_extractions(user_id: int, limit: int = 50) -> list:
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM extractions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-        (user_id, limit),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM extractions WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
+            (user_id, limit),
+        )
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def update_extraction_status(extraction_id: int, user_id: int, status: str) -> bool:
-    conn = get_conn()
-    cur = conn.execute(
-        "UPDATE extractions SET status = ? WHERE id = ? AND user_id = ?",
-        (status, extraction_id, user_id),
-    )
-    conn.commit()
-    ok = cur.rowcount > 0
-    conn.close()
-    return ok
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE extractions SET status = %s WHERE id = %s AND user_id = %s",
+            (status, extraction_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def update_extraction_tags(extraction_id: int, user_id: int, tags: str) -> bool:
-    conn = get_conn()
-    cur = conn.execute(
-        "UPDATE extractions SET tags = ? WHERE id = ? AND user_id = ?",
-        (tags, extraction_id, user_id),
-    )
-    conn.commit()
-    ok = cur.rowcount > 0
-    conn.close()
-    return ok
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE extractions SET tags = %s WHERE id = %s AND user_id = %s",
+            (tags, extraction_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def get_pipeline_stats(user_id: int) -> dict:
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT status, COUNT(*) as count FROM extractions WHERE user_id = ? GROUP BY status",
-        (user_id,),
-    ).fetchall()
-    conn.close()
-    stats = {r["status"]: r["count"] for r in rows}
-    return {
-        "active": stats.get("active", 0),
-        "under_contract": stats.get("under_contract", 0),
-        "closed": stats.get("closed", 0),
-        "archived": stats.get("archived", 0),
-        "total": sum(stats.values()),
-    }
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT
+                COUNT(*) FILTER (WHERE status = 'active') AS active,
+                COUNT(*) FILTER (WHERE status = 'under_contract') AS under_contract,
+                COUNT(*) FILTER (WHERE status = 'closed') AS closed,
+                COUNT(*) FILTER (WHERE status = 'archived') AS archived,
+                COUNT(*) AS total
+            FROM extractions WHERE user_id = %s""",
+            (user_id,),
+        )
+        return dict(cur.fetchone())
+    finally:
+        conn.close()
 
 
 def save_manual_deal(user_id: int, filename: str, result_json: str, status: str, tags: str):
-    conn = get_conn()
-    conn.execute(
-        "INSERT INTO extractions (user_id, filename, result_json, status, tags) VALUES (?, ?, ?, ?, ?)",
-        (user_id, filename, result_json, status, tags),
-    )
-    conn.commit()
-    conn.close()
-
-
-def check_rate_limit(api_key: str, max_per_month: int = 50) -> bool:
-    """Returns True if under limit, False if over. Uses UTC month boundaries."""
-    conn = get_conn()
-    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    user = conn.execute(
-        "SELECT requests_month, last_month_date FROM users WHERE api_key = ?",
-        (api_key,),
-    ).fetchone()
-
-    if user is None:
-        conn.close()
-        return False
-
-    if user["last_month_date"] != this_month:
-        conn.execute(
-            "UPDATE users SET requests_month = 0, last_month_date = ? WHERE api_key = ?",
-            (this_month, api_key),
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO extractions (user_id, filename, result_json, status, tags) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, filename, result_json, status, tags),
         )
         conn.commit()
+    finally:
         conn.close()
-        return True
 
-    under = (user["requests_month"] or 0) < max_per_month
-    conn.close()
-    return under
+
+def check_rate_limit(api_key: str, max_per_month: int = 10) -> bool:
+    """Returns True if under limit, False if over. Uses UTC month boundaries."""
+    conn = get_pool()
+    try:
+        cur = conn.cursor()
+        this_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        cur.execute(
+            "SELECT requests_month, last_month_date FROM users WHERE api_key = %s",
+            (api_key,),
+        )
+        user = cur.fetchone()
+        if user is None:
+            return False
+
+        if user["last_month_date"] != this_month:
+            cur.execute(
+                "UPDATE users SET requests_month = 0, last_month_date = %s WHERE api_key = %s",
+                (this_month, api_key),
+            )
+            conn.commit()
+            return True
+
+        under = (user["requests_month"] or 0) < max_per_month
+        return under
+    finally:
+        conn.close()
 
 
 def increment_request_count(api_key: str):
-    conn = get_conn()
-    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    conn.execute(
-        """UPDATE users SET requests_month = requests_month + 1,
-           last_month_date = ? WHERE api_key = ?""",
-        (this_month, api_key),
-    )
-    conn.commit()
-    conn.close()
-
-
-# ---------------------------------------------------------------------------
-# Underwriting
-# ---------------------------------------------------------------------------
-def save_underwriting(extraction_id: int, user_id: int, underwriting_json: str):
-    conn = get_conn()
-    # Add underwriting column if not exists
+    conn = get_pool()
     try:
-        conn.execute("ALTER TABLE extractions ADD COLUMN underwriting TEXT DEFAULT NULL")
+        cur = conn.cursor()
+        this_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        cur.execute(
+            "UPDATE users SET requests_month = requests_month + 1, last_month_date = %s WHERE api_key = %s",
+            (this_month, api_key),
+        )
         conn.commit()
-    except sqlite3.OperationalError:
-        pass  # column already exists
-    conn.execute(
-        "UPDATE extractions SET underwriting = ? WHERE id = ? AND user_id = ?",
-        (underwriting_json, extraction_id, user_id),
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_underwriting(extraction_id: int, user_id: int) -> Optional[str]:
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT underwriting FROM extractions WHERE id = ? AND user_id = ?",
-        (extraction_id, user_id),
-    ).fetchone()
-    conn.close()
-    return row["underwriting"] if row and row["underwriting"] else None
+    finally:
+        conn.close()
