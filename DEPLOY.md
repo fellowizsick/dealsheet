@@ -46,3 +46,4 @@ Make sure this env var matches your Vercel domain exactly.
 | `RATE_LIMIT_PER_DAY` | Backend | `50` |
 | `NEXT_PUBLIC_API_URL` | Frontend | `https://myapp.railway.app` |
 | `JWT_SECRET` | Backend (optional) | Auto-generated if not set |
+# Stripe config update
