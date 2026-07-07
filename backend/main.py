@@ -302,6 +302,19 @@ async def debug():
         conn.close()
     except Exception as e:
         result["db"] = f"FAILED: {e}"
+        # Try to show what pg8000 parsed
+        try:
+            from urllib.parse import urlparse
+            url = os.environ.get("DATABASE_URL", os.environ.get("PGURL", ""))
+            parsed = urlparse(url)
+            result["db_parse"] = {
+                "hostname": parsed.hostname,
+                "port": parsed.port,
+                "username": parsed.username,
+                "database": parsed.path.lstrip("/") if parsed.path else None,
+            }
+        except Exception as e2:
+            result["db_parse_error"] = str(e2)
     try:
         import pg8000; result["pg8000"] = pg8000.__version__
     except ImportError:
