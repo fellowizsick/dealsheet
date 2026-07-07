@@ -10,4 +10,3 @@ bcrypt>=4.0.0
 resend>=2.30.0
 sentry-sdk>=2.0.0
 posthog>=3.0.0
-# Docker cache buster
