@@ -27,9 +27,13 @@ def init_db():
             api_key     TEXT UNIQUE NOT NULL,
             stripe_customer_id TEXT,
             created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-            requests_today INTEGER DEFAULT 0,
-            last_request_date TEXT
+            requests_month INTEGER DEFAULT 0,
+            last_month_date TEXT
         );
+
+        -- Migrate old daily columns to monthly
+        ALTER TABLE users ADD COLUMN requests_month INTEGER DEFAULT 0;
+        ALTER TABLE users ADD COLUMN last_month_date TEXT;
 
         CREATE TABLE IF NOT EXISTS extractions (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -284,12 +288,12 @@ def save_manual_deal(user_id: int, filename: str, result_json: str, status: str,
     conn.close()
 
 
-def check_rate_limit(api_key: str, max_per_day: int = 50) -> bool:
-    """Returns True if under limit, False if over. Uses UTC day boundaries."""
+def check_rate_limit(api_key: str, max_per_month: int = 50) -> bool:
+    """Returns True if under limit, False if over. Uses UTC month boundaries."""
     conn = get_conn()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
     user = conn.execute(
-        "SELECT requests_today, last_request_date FROM users WHERE api_key = ?",
+        "SELECT requests_month, last_month_date FROM users WHERE api_key = ?",
         (api_key,),
     ).fetchone()
 
@@ -297,27 +301,27 @@ def check_rate_limit(api_key: str, max_per_day: int = 50) -> bool:
         conn.close()
         return False
 
-    if user["last_request_date"] != today:
+    if user["last_month_date"] != this_month:
         conn.execute(
-            "UPDATE users SET requests_today = 0, last_request_date = ? WHERE api_key = ?",
-            (today, api_key),
+            "UPDATE users SET requests_month = 0, last_month_date = ? WHERE api_key = ?",
+            (this_month, api_key),
         )
         conn.commit()
         conn.close()
         return True
 
-    under = user["requests_today"] < max_per_day
+    under = (user["requests_month"] or 0) < max_per_month
     conn.close()
     return under
 
 
 def increment_request_count(api_key: str):
     conn = get_conn()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
     conn.execute(
-        """UPDATE users SET requests_today = requests_today + 1,
-           last_request_date = ? WHERE api_key = ?""",
-        (today, api_key),
+        """UPDATE users SET requests_month = requests_month + 1,
+           last_month_date = ? WHERE api_key = ?""",
+        (this_month, api_key),
     )
     conn.commit()
     conn.close()
