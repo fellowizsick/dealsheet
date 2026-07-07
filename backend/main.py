@@ -59,6 +59,7 @@ FRONTEND_ORIGIN = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 ALLOWED_ORIGINS = [
     FRONTEND_ORIGIN,
     "https://dealsheet-three.vercel.app",
+    "https://frontend-two-rose-16.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
 ]
