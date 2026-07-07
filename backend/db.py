@@ -29,11 +29,16 @@ def get_pool():
 get_conn = get_pool
 
 
+def _cols(cur):
+    """Get column names from a pg8000 cursor description."""
+    return [d[0] for d in cur.description] if cur.description else []
+
+
 def _row_to_dict(row, cur):
     """Convert a pg8000 row (tuple) to a dict using column names."""
     if row is None:
         return None
-    cols = [c.name for c in cur.columns]
+    cols = _cols(cur)
     return OrderedDict(zip(cols, row))
 
 
@@ -41,7 +46,7 @@ def _rows_to_dicts(rows, cur):
     """Convert list of pg8000 rows to list of dicts."""
     if not rows:
         return []
-    cols = [c.name for c in cur.columns]
+    cols = _cols(cur)
     return [OrderedDict(zip(cols, r)) for r in rows]
 
 
@@ -72,7 +77,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
     conn = get_pool()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, email, password, api_key, stripe_customer_id, subscription_status, subscription_ends_at, is_verified, verification_token, reset_token, reset_token_expires, requests_month, last_month_date, created_at FROM users WHERE email = %s", (email,))
         row = cur.fetchone()
         return _row_to_dict(row, cur) if row else None
     finally:
@@ -83,7 +88,7 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
     conn = get_pool()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        cur.execute("SELECT id, email, password, api_key, stripe_customer_id, subscription_status, subscription_ends_at, is_verified, verification_token, reset_token, reset_token_expires, requests_month, last_month_date, created_at FROM users WHERE id = %s", (user_id,))
         row = cur.fetchone()
         return _row_to_dict(row, cur) if row else None
     finally:
@@ -94,7 +99,7 @@ def get_user_by_api_key(api_key: str) -> Optional[dict]:
     conn = get_pool()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
+        cur.execute("SELECT id, email, password, api_key, stripe_customer_id, subscription_status, subscription_ends_at, is_verified, verification_token, reset_token, reset_token_expires, requests_month, last_month_date, created_at FROM users WHERE api_key = %s", (api_key,))
         row = cur.fetchone()
         return _row_to_dict(row, cur) if row else None
     finally:
@@ -159,7 +164,7 @@ def get_user_by_verification_token(token: str) -> Optional[dict]:
     conn = get_pool()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE verification_token = %s", (token,))
+        cur.execute("SELECT id, email, password, api_key, stripe_customer_id, subscription_status, subscription_ends_at, is_verified, verification_token, reset_token, reset_token_expires, requests_month, last_month_date, created_at FROM users WHERE verification_token = %s", (token,))
         row = cur.fetchone()
         return _row_to_dict(row, cur) if row else None
     finally:
@@ -184,7 +189,7 @@ def get_user_by_reset_token(token: str) -> Optional[dict]:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM users WHERE reset_token = %s AND reset_token_expires > NOW()",
+            "SELECT id, email, password, api_key, stripe_customer_id, subscription_status, subscription_ends_at, is_verified, verification_token, reset_token, reset_token_expires, requests_month, last_month_date, created_at FROM users WHERE reset_token = %s AND reset_token_expires > NOW()",
             (token,),
         )
         row = cur.fetchone()
