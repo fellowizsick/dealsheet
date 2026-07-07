@@ -65,7 +65,7 @@ export default function LandingPage() {
               See How It Works
             </Link>
           </div>
-          <p className="text-white/50 text-sm mt-4">No credit card required • 200 free extractions/month</p>
+          <p className="text-white/50 text-sm mt-4">No credit card required • 10 free extractions/month</p>
         </div>
       </section>
 
@@ -121,7 +121,7 @@ export default function LandingPage() {
           <p className="text-[#A39C8E] text-center mb-12">Start free. Upgrade when you need more.</p>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { id: "free", name: "Free", price: "$0", desc: "200 extractions/month", features: ["AI extraction", "CSV export", "Pipeline kanban", "7-day history"], cta: "Get Started", popular: false, href: "/signup" },
+              { id: "free", name: "Free", price: "$0", desc: "10 extractions/month", features: ["AI extraction", "CSV export", "Pipeline kanban", "7-day history"], cta: "Get Started", popular: false, href: "/signup" },
               { id: "pro", name: "Pro", price: "$29", desc: "Unlimited extractions", features: ["Everything in Free", "Unlimited history", "Deal underwriting analysis", "Batch export", "Priority support"], cta: "Subscribe", popular: true, href: null },
               { id: "agency", name: "Agency", price: "$49", desc: "Unlimited + Team", features: ["Everything in Pro", "Team sharing (up to 5)", "API access", "Custom branding", "White-label exports"], cta: "Subscribe", popular: false, href: null },
             ].map((plan) => (

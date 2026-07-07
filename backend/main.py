@@ -268,7 +268,7 @@ async def reset_password(body: ResetPasswordRequest):
 def check_rate(user: dict = Depends(get_current_user)):
     """Tiered rate limit: free users 50/month, paid users unlimited."""
     is_paid = user.get("subscription_status") in ("active", "canceled") and user.get("stripe_customer_id")
-    max_per_period = 0 if is_paid else 50  # 0 = unlimited
+    max_per_period = 0 if is_paid else 10  # 0 = unlimited
 
     if max_per_period > 0 and not check_rate_limit(user["api_key"], max_per_period):
         raise HTTPException(

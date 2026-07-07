@@ -25,7 +25,7 @@ export default function TermsPage() {
         <p>Subscriptions are billed monthly via Stripe. You can cancel at any time — access continues until the end of your billing period. No prorated refunds for partial months. Refund requests within 14 days of purchase will be reviewed on a case-by-case basis.</p>
 
         <h2>4. Usage Limits</h2>
-        <p>Free accounts are limited to 50 extractions per day. Paid accounts have unlimited extractions subject to fair use (excessive automated usage may result in rate limiting).</p>
+        <p>Free accounts are limited to 10 extractions per month. Paid accounts have unlimited extractions subject to fair use (excessive automated usage may result in rate limiting).</p>
 
         <h2>5. Data Handling</h2>
         <p>Uploaded documents are processed in memory and not permanently stored. Extracted data is saved to your account for pipeline tracking. We do not use your uploaded contracts to train AI models. We implement industry-standard encryption for data in transit (TLS) and at rest.</p>
