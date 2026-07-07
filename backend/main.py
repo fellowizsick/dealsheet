@@ -285,6 +285,29 @@ def check_rate(user: dict = Depends(get_current_user)):
 async def health():
     return {"status": "ok", "model": MODEL_NAME}
 
+@app.get("/debug")
+async def debug():
+    """Diagnose database, env vars, and imports."""
+    import os, sys
+    result = {"python": sys.version, "env": {}}
+    for k in ["DATABASE_URL", "STRIPE_SECRET_KEY", "GEMINI_API_KEY"]:
+        v = os.environ.get(k, "")
+        result["env"][k] = f"exists ({len(v)} chars)" if v else "missing"
+    try:
+        from db import get_pool
+        conn = get_pool()
+        cur = conn.cursor()
+        cur.execute("SELECT count(*) AS cnt FROM users")
+        result["db"] = f"connected, {cur.fetchone()[0]} users"
+        conn.close()
+    except Exception as e:
+        result["db"] = f"FAILED: {e}"
+    try:
+        import pg8000; result["pg8000"] = pg8000.__version__
+    except ImportError:
+        result["pg8000"] = "NOT INSTALLED"
+    return result
+
 # ---------------------------------------------------------------------------
 # Stripe
 # ---------------------------------------------------------------------------
