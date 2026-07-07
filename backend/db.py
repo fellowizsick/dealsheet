@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse, unquote
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -11,9 +12,17 @@ DATABASE_URL = os.environ.get(
 
 
 def get_pool():
-    """Simple direct connection (pooling handled by Supabase pgBouncer)."""
+    """Simple direct connection (pooling handled by Supabase pgBouncer).
+    Parses DATABASE_URL manually since pg8000 doesn't support URL DSN."""
     import pg8000
-    return pg8000.connect(DATABASE_URL)
+    parsed = urlparse(DATABASE_URL)
+    return pg8000.connect(
+        host=parsed.hostname or "aws-0-us-east-1.pooler.supabase.com",
+        port=parsed.port or 6543,
+        database=parsed.path.lstrip("/") if parsed.path else "postgres",
+        user=parsed.username or "postgres.bfolwcqzxleympwshmju",
+        password=unquote(parsed.password) if parsed.password else "DealSheetDB2026!"
+    )
 
 
 # Alias for backwards compatibility with main.py
