@@ -3,14 +3,14 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install dependencies
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
-COPY backend/ .
+COPY . .
 
 # Entrypoint handles PORT expansion with proper signal handling
-COPY backend/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
