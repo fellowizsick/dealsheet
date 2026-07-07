@@ -302,7 +302,7 @@ async def debug():
     """Diagnose database, env vars, and imports."""
     import os, sys
     result = {"python": sys.version, "env": {}}
-    for k in ["DATABASE_URL", "STRIPE_SECRET_KEY", "GEMINI_API_KEY"]:
+    for k in ["DATABASE_URL", "STRIPE_SECRET_KEY", "GEMINI_API_KEY", "JWT_SECRET", "FRONTEND_URL"]:
         v = os.environ.get(k, "")
         result["env"][k] = {"len": len(v), "start": v[:25] + "..." if len(v) > 25 else v}
     try:
