@@ -319,6 +319,14 @@ async def debug():
         import pg8000; result["pg8000"] = pg8000.__version__
     except ImportError:
         result["pg8000"] = "NOT INSTALLED"
+    try:
+        import bcrypt; result["bcrypt"] = bcrypt.__version__
+    except Exception as e:
+        result["bcrypt"] = f"FAILED: {e}"
+    try:
+        import jwt; result["jwt"] = jwt.__version__
+    except Exception as e:
+        result["jwt"] = f"FAILED: {e}"
     return result
 
 # ---------------------------------------------------------------------------
