@@ -292,7 +292,7 @@ async def debug():
     result = {"python": sys.version, "env": {}}
     for k in ["DATABASE_URL", "STRIPE_SECRET_KEY", "GEMINI_API_KEY"]:
         v = os.environ.get(k, "")
-        result["env"][k] = f"exists ({len(v)} chars)" if v else "missing"
+        result["env"][k] = {"len": len(v), "start": v[:25] + "..." if len(v) > 25 else v}
     try:
         from db import get_pool
         conn = get_pool()
