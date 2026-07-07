@@ -1,7 +1,6 @@
-"""Supabase/Postgres database layer for DealSheet."""
+"""Supabase/Postgres database layer for DealSheet using pg8000 (pure Python)."""
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -13,15 +12,32 @@ DATABASE_URL = os.environ.get(
 
 def get_pool():
     """Simple direct connection (pooling handled by Supabase pgBouncer)."""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode="require")
+    import pg8000
+    return pg8000.connect(DATABASE_URL)
 
 
 # Alias for backwards compatibility with main.py
 get_conn = get_pool
 
 
+def _row_to_dict(row, cur):
+    """Convert a pg8000 row (tuple) to a dict using column names."""
+    if row is None:
+        return None
+    cols = [c.name for c in cur.columns]
+    return OrderedDict(zip(cols, row))
+
+
+def _rows_to_dicts(rows, cur):
+    """Convert list of pg8000 rows to list of dicts."""
+    if not rows:
+        return []
+    cols = [c.name for c in cur.columns]
+    return [OrderedDict(zip(cols, r)) for r in rows]
+
+
 def init_db():
-    """Tables already created via migration. This is a no-op for new Postgres."""
+    """Tables already created via migration."""
     pass
 
 
@@ -33,10 +49,10 @@ def create_user(email: str, password_hash: str, api_key: str) -> Optional[int]:
             "INSERT INTO users (email, password, api_key) VALUES (%s, %s, %s) RETURNING id",
             (email, password_hash, api_key),
         )
-        user_id = cur.fetchone()["id"]
+        user_id = cur.fetchone()[0]
         conn.commit()
         return user_id
-    except psycopg2.errors.UniqueViolation:
+    except Exception:
         conn.rollback()
         return None
     finally:
@@ -49,7 +65,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
@@ -60,7 +76,7 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
@@ -71,13 +87,12 @@ def get_user_by_api_key(api_key: str) -> Optional[dict]:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE api_key = %s", (api_key,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
 
 def migrate_user_schema():
-    """Schema already created. No-op stub for compatibility."""
     pass
 
 
@@ -103,8 +118,9 @@ def get_subscription(user_id: int) -> dict:
             (user_id,),
         )
         row = cur.fetchone()
-        if row and row.get("subscription_status"):
-            return {"status": row["subscription_status"], "ends_at": row.get("subscription_ends_at")}
+        d = _row_to_dict(row, cur) if row else None
+        if d and d.get("subscription_status"):
+            return {"status": d["subscription_status"], "ends_at": d.get("subscription_ends_at")}
         return {"status": None, "ends_at": None}
     finally:
         conn.close()
@@ -136,7 +152,7 @@ def get_user_by_verification_token(token: str) -> Optional[dict]:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE verification_token = %s", (token,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
@@ -163,7 +179,7 @@ def get_user_by_reset_token(token: str) -> Optional[dict]:
             (token,),
         )
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
@@ -217,7 +233,7 @@ def get_job(job_id: str) -> Optional[dict]:
         cur = conn.cursor()
         cur.execute("SELECT * FROM extraction_jobs WHERE id = %s", (job_id,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(row, cur) if row else None
     finally:
         conn.close()
 
@@ -230,7 +246,7 @@ def save_extraction(user_id: int, filename: str, result_json: str) -> int:
             "INSERT INTO extractions (user_id, filename, result_json) VALUES (%s, %s, %s) RETURNING id",
             (user_id, filename, result_json),
         )
-        ext_id = cur.fetchone()["id"]
+        ext_id = cur.fetchone()[0]
         conn.commit()
         return ext_id
     finally:
@@ -246,7 +262,7 @@ def get_user_extractions(user_id: int, limit: int = 50) -> list:
             (user_id, limit),
         )
         rows = cur.fetchall()
-        return [dict(r) for r in rows]
+        return _rows_to_dicts(rows, cur) if rows else []
     finally:
         conn.close()
 
@@ -293,7 +309,8 @@ def get_pipeline_stats(user_id: int) -> dict:
             FROM extractions WHERE user_id = %s""",
             (user_id,),
         )
-        return dict(cur.fetchone())
+        row = cur.fetchone()
+        return _row_to_dict(row, cur) if row else {"active": 0, "under_contract": 0, "closed": 0, "archived": 0, "total": 0}
     finally:
         conn.close()
 
@@ -312,7 +329,6 @@ def save_manual_deal(user_id: int, filename: str, result_json: str, status: str,
 
 
 def check_rate_limit(api_key: str, max_per_month: int = 10) -> bool:
-    """Returns True if under limit, False if over. Uses UTC month boundaries."""
     conn = get_pool()
     try:
         cur = conn.cursor()
@@ -321,11 +337,12 @@ def check_rate_limit(api_key: str, max_per_month: int = 10) -> bool:
             "SELECT requests_month, last_month_date FROM users WHERE api_key = %s",
             (api_key,),
         )
-        user = cur.fetchone()
-        if user is None:
+        row = cur.fetchone()
+        d = _row_to_dict(row, cur) if row else None
+        if d is None:
             return False
 
-        if user["last_month_date"] != this_month:
+        if d["last_month_date"] != this_month:
             cur.execute(
                 "UPDATE users SET requests_month = 0, last_month_date = %s WHERE api_key = %s",
                 (this_month, api_key),
@@ -333,7 +350,7 @@ def check_rate_limit(api_key: str, max_per_month: int = 10) -> bool:
             conn.commit()
             return True
 
-        under = (user["requests_month"] or 0) < max_per_month
+        under = (d["requests_month"] or 0) < max_per_month
         return under
     finally:
         conn.close()
