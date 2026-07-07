@@ -339,7 +339,6 @@ async def debug():
         import jwt; result["jwt"] = jwt.__version__
     except Exception as e:
         result["jwt"] = f"FAILED: {e}"
-    # Test signup flow
     try:
         from auth import hash_password, generate_api_key, create_token
         from db import create_user as db_create
@@ -349,6 +348,17 @@ async def debug():
         result["signup_test"] = f"hash={len(pw)} key={len(key)} token={len(tok)}"
     except Exception as e:
         result["signup_test"] = f"FAILED: {e}"
+    try:
+        import stripe
+        s = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": "price_1TqJauGxy4Bq02M1Wa9dHqV1", "quantity": 1}],
+            success_url="https://example.com/success",
+            cancel_url="https://example.com/cancel",
+        )
+        result["stripe_test"] = f"✅ URL: {s.url[:40]}..."
+    except Exception as e:
+        result["stripe_test"] = f"FAILED: {e}"
     return result
 
 # ---------------------------------------------------------------------------
