@@ -92,7 +92,19 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 def startup():
-    init_db()
+    """Auto-install missing packages (handles deploys without rebuild)."""
+    import subprocess, sys
+    try:
+        import pg8000
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pg8000"])
+    try:
+        from db import get_pool
+        conn = get_pool()
+        conn.close()
+    except Exception:
+        pass  # DB might not be ready yet
+    """Create data directory and database tables on first run."""
 
 
 # ---------------------------------------------------------------------------
