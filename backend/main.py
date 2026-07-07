@@ -327,6 +327,16 @@ async def debug():
         import jwt; result["jwt"] = jwt.__version__
     except Exception as e:
         result["jwt"] = f"FAILED: {e}"
+    # Test signup flow
+    try:
+        from auth import hash_password, generate_api_key, create_token
+        from db import create_user as db_create
+        pw = hash_password("test1234")
+        key = generate_api_key()
+        tok = create_token(1)
+        result["signup_test"] = f"hash={len(pw)} key={len(key)} token={len(tok)}"
+    except Exception as e:
+        result["signup_test"] = f"FAILED: {e}"
     return result
 
 # ---------------------------------------------------------------------------
